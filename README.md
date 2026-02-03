@@ -48,13 +48,13 @@ await page.ApplyStealthAsync(config);
 2. Restore dependencies:
 
 ```bash
- dotnet restore Playwright.Stealth.sln
+ dotnet restore ManagedCode.Playwright.Stealth.sln
 ```
 
 3. Run tests (uses Microsoft.Testing.Platform via `global.json`):
 
 ```bash
- dotnet test --solution Playwright.Stealth.sln --configuration Release
+ dotnet test --solution ManagedCode.Playwright.Stealth.sln --configuration Release
 ```
 
 ## Test Sites

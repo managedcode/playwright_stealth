@@ -24,10 +24,10 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Restore dependencies
-      run: dotnet restore Playwright.Stealth.sln
+      run: dotnet restore ManagedCode.Playwright.Stealth.sln
 
     - name: Build
-      run: dotnet build Playwright.Stealth.sln --configuration Release --no-restore
+      run: dotnet build ManagedCode.Playwright.Stealth.sln --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --solution Playwright.Stealth.sln --configuration Release --no-build --verbosity normal
+      run: dotnet test --solution ManagedCode.Playwright.Stealth.sln --configuration Release --no-build --verbosity normal
