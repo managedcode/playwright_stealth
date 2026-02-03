@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>ManagedCode.Playwright.Stealth</PackageId>
+    <Title>ManagedCode.Playwright.Stealth</Title>
+    <Description>Stealth tweaks for Microsoft.Playwright.</Description>
+    <PackageTags>playwright;stealth;bot-detection</PackageTags>
+    <RootNamespace>ManagedCode.Playwright.Stealth</RootNamespace>
+    <AssemblyName>ManagedCode.Playwright.Stealth</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" Version="1.58.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/js/*.js" />
+  </ItemGroup>
+
+</Project>

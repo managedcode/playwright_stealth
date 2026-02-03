@@ -1,0 +1,34 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <DebugType>embedded</DebugType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>ManagedCode Community</Authors>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryType>Github</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/managedcode/Playwright.Stealth</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/managedcode/Playwright.Stealth</PackageProjectUrl>
+    <Product>ManagedCode Playwright Stealth</Product>
+    <Version>1.0.0</Version>
+    <PackageVersion>1.0.0</PackageVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(SolutionDir)README.md" Pack="true" Visible="false" PackagePath="\\" />
+  </ItemGroup>
+</Project>
