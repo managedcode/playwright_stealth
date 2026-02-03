@@ -2,7 +2,7 @@ using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace Playwright.Stealth.Tests;
+namespace ManagedCode.Playwright.Stealth.Tests;
 
 public sealed class StealthConfigTests
 {

@@ -1,11 +1,11 @@
 using System.Globalization;
 using Microsoft.Playwright;
-using Playwright.Stealth;
+using ManagedCode.Playwright.Stealth;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace Playwright.Stealth.Tests;
+namespace ManagedCode.Playwright.Stealth.Tests;
 
 public sealed class StealthIntegrationTests
 {

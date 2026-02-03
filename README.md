@@ -1,4 +1,4 @@
-# Playwright.Stealth (.NET)
+# ManagedCode.Playwright.Stealth (.NET)
 
 A .NET port of the Playwright stealth scripts from [AtuboDad/playwright_stealth](https://github.com/AtuboDad/playwright_stealth).
 This package adds a single call to apply a collection of stealth init scripts to a Playwright page or browser context.
@@ -6,14 +6,14 @@ This package adds a single call to apply a collection of stealth init scripts to
 ## Install
 
 ```bash
- dotnet add package Playwright.Stealth
+ dotnet add package ManagedCode.Playwright.Stealth
 ```
 
 ## Usage
 
 ```csharp
 using Microsoft.Playwright;
-using Playwright.Stealth;
+using ManagedCode.Playwright.Stealth;
 
 using var playwright = await Playwright.CreateAsync();
 await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions

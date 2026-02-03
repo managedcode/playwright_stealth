@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace Playwright.Stealth;
+namespace ManagedCode.Playwright.Stealth;
 
 public static class PlaywrightStealthExtensions
 {

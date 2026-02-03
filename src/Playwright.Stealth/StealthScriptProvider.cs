@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
-namespace Playwright.Stealth;
+namespace ManagedCode.Playwright.Stealth;
 
 internal static class StealthScriptProvider
 {

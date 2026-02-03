@@ -1,10 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Playwright.Stealth</PackageId>
-    <Title>Playwright.Stealth</Title>
+    <PackageId>ManagedCode.Playwright.Stealth</PackageId>
+    <Title>ManagedCode.Playwright.Stealth</Title>
     <Description>Stealth tweaks for Microsoft.Playwright.</Description>
     <PackageTags>playwright;stealth;bot-detection</PackageTags>
+    <RootNamespace>ManagedCode.Playwright.Stealth</RootNamespace>
+    <AssemblyName>ManagedCode.Playwright.Stealth</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json;
 
-namespace Playwright.Stealth;
+namespace ManagedCode.Playwright.Stealth;
 
 public sealed class StealthConfig
 {

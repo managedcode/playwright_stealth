@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
+    <RootNamespace>ManagedCode.Playwright.Stealth.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
