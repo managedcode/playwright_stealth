@@ -16,36 +16,61 @@ public sealed class StealthIntegrationTests
     private const string SignalAttributeName = "data-stealth-signals";
     private const int NetworkIdleTimeoutMs = 10_000;
     private static readonly string ScreenshotDirectory = Path.Combine(AppContext.BaseDirectory, "artifacts", "screenshots");
+    private static readonly string SignalDirectory = Path.Combine(AppContext.BaseDirectory, "artifacts", "signals");
 
     [Test]
     public Task BrowserScan_Should_Not_Surface_BotSignals() =>
-        RunStealthCheckAsync(StealthTestSites.BrowserScan);
+        RunSiteCheckAsync(StealthTestSites.BrowserScan, applyStealth: true);
 
     [Test]
     public Task SannySoft_Should_Not_Surface_BotSignals() =>
-        RunStealthCheckAsync(StealthTestSites.SannySoft);
+        RunSiteCheckAsync(StealthTestSites.SannySoft, applyStealth: true);
 
     [Test]
     public Task Intoli_Should_Not_Surface_BotSignals() =>
-        RunStealthCheckAsync(StealthTestSites.Intoli);
+        RunSiteCheckAsync(StealthTestSites.Intoli, applyStealth: true);
 
     [Test]
     public Task Fingerprint_Should_Not_Surface_BotSignals() =>
-        RunStealthCheckAsync(StealthTestSites.Fingerprint);
+        RunSiteCheckAsync(StealthTestSites.Fingerprint, applyStealth: true);
 
     [Test]
     public Task AreYouHeadless_Should_Not_Surface_BotSignals() =>
-        RunStealthCheckAsync(StealthTestSites.AreYouHeadless);
+        RunSiteCheckAsync(StealthTestSites.AreYouHeadless, applyStealth: true);
 
     [Test]
     public Task PixelScan_Should_Not_Surface_BotSignals() =>
-        RunStealthCheckAsync(StealthTestSites.PixelScan);
+        RunSiteCheckAsync(StealthTestSites.PixelScan, applyStealth: true);
+
+    [Test]
+    public Task BrowserScan_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.BrowserScan, applyStealth: false);
+
+    [Test]
+    public Task SannySoft_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.SannySoft, applyStealth: false);
+
+    [Test]
+    public Task Intoli_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.Intoli, applyStealth: false);
+
+    [Test]
+    public Task Fingerprint_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.Fingerprint, applyStealth: false);
+
+    [Test]
+    public Task AreYouHeadless_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.AreYouHeadless, applyStealth: false);
+
+    [Test]
+    public Task PixelScan_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.PixelScan, applyStealth: false);
 
     [Test]
     [GoogleSearchOnly]
     public async Task GoogleSearch_Should_Find_ManagedCode()
     {
-        await WithStealthPageAsync(async page =>
+        await WithPageAsync(applyStealth: true, async page =>
         {
             var label = "google_search";
             try
@@ -75,25 +100,31 @@ public sealed class StealthIntegrationTests
         });
     }
 
-    private static async Task RunStealthCheckAsync(string url)
+    private static async Task RunSiteCheckAsync(string url, bool applyStealth)
     {
-        await WithStealthPageAsync(async page =>
+        await WithPageAsync(applyStealth, async page =>
         {
             var label = GetScreenshotLabelFromUrl(url);
+            var modeLabel = applyStealth ? "stealth" : "baseline";
             try
             {
                 await NavigateWithRetriesAsync(page, url);
                 await PrimePageAsync(page);
-                await AssertStealthSignalsAsync(page);
+                var signals = await GetSignalsAsync(page);
+                await PersistSignalsAsync($"{modeLabel}_{label}", url, modeLabel, signals);
+                if (applyStealth)
+                {
+                    await AssertStealthSignalsAsync(signals);
+                }
             }
             finally
             {
-                await CaptureScreenshotAsync(page, label);
+                await CaptureScreenshotAsync(page, $"{modeLabel}_{label}");
             }
         });
     }
 
-    private static async Task WithStealthPageAsync(Func<IPage, Task> action)
+    private static async Task WithPageAsync(bool applyStealth, Func<IPage, Task> action)
     {
         await PlaywrightInstall.EnsureInstalledAsync();
         using var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
@@ -105,10 +136,15 @@ public sealed class StealthIntegrationTests
 
         await using var context = await browser.NewContextAsync(new BrowserNewContextOptions
         {
-            Locale = CultureInfo.CurrentCulture.Name
+            Locale = CultureInfo.CurrentCulture.Name,
+            ViewportSize = new ViewportSize { Width = 1920, Height = 1080 },
+            DeviceScaleFactor = 2
         });
 
-        await context.ApplyStealthAsync();
+        if (applyStealth)
+        {
+            await context.ApplyStealthAsync();
+        }
         var page = await context.NewPageAsync();
         await InstallSignalProbeAsync(page);
 
@@ -144,7 +180,7 @@ public sealed class StealthIntegrationTests
         throw new InvalidOperationException($"Navigation failed for {url}.", lastError);
     }
 
-    private static async Task AssertStealthSignalsAsync(IPage page)
+    private static async Task<StealthSignals> GetSignalsAsync(IPage page)
     {
         await page.WaitForFunctionAsync($"() => document.documentElement.hasAttribute('{SignalAttributeName}')", new PageWaitForFunctionOptions
         {
@@ -167,6 +203,11 @@ public sealed class StealthIntegrationTests
             throw new InvalidOperationException("Stealth signal payload could not be parsed.");
         }
 
+        return signals;
+    }
+
+    private static async Task AssertStealthSignalsAsync(StealthSignals signals)
+    {
         await Assert.That(signals.WebDriver).IsFalse();
         if (signals.PluginCount <= 0)
         {
@@ -293,17 +334,92 @@ public sealed class StealthIntegrationTests
             Directory.CreateDirectory(ScreenshotDirectory);
             var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
             var safeLabel = SanitizeFileName(label);
-            var path = Path.Combine(ScreenshotDirectory, $"{timestamp}_{safeLabel}.png");
+            var baseName = $"{timestamp}_{safeLabel}";
+            var path = Path.Combine(ScreenshotDirectory, $"{baseName}.png");
             await page.ScreenshotAsync(new PageScreenshotOptions
             {
                 Path = path,
                 FullPage = true
             });
             Console.WriteLine($"Saved screenshot: {path}");
+
+            await CaptureViewportSlicesAsync(page, baseName);
         }
         catch (Exception ex) when (ex is IOException or PlaywrightException)
         {
             Console.WriteLine($"Failed to capture screenshot: {ex.Message}");
+        }
+    }
+
+    private static async Task PersistSignalsAsync(string label, string url, string mode, StealthSignals signals)
+    {
+        try
+        {
+            Directory.CreateDirectory(SignalDirectory);
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture);
+            var safeLabel = SanitizeFileName(label);
+            var path = Path.Combine(SignalDirectory, $"{timestamp}_{safeLabel}.json");
+            var payload = new SignalSnapshot
+            {
+                Url = url,
+                Mode = mode,
+                TimestampUtc = DateTimeOffset.UtcNow,
+                Signals = signals
+            };
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+            await File.WriteAllTextAsync(path, json);
+            Console.WriteLine($"Saved signals: {path}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"Failed to persist signals: {ex.Message}");
+        }
+    }
+
+    private static async Task CaptureViewportSlicesAsync(IPage page, string baseName)
+    {
+        try
+        {
+            var metrics = await page.EvaluateAsync<ViewportMetrics>("""
+                () => ({
+                    scrollHeight: document.documentElement.scrollHeight,
+                    viewportHeight: window.innerHeight
+                })
+                """);
+
+            if (metrics.ScrollHeight <= 0 || metrics.ViewportHeight <= 0)
+            {
+                return;
+            }
+
+            var step = Math.Max(1, metrics.ViewportHeight - 120);
+            var index = 1;
+            for (var offset = 0; offset < metrics.ScrollHeight; offset += step)
+            {
+                await page.EvaluateAsync("y => window.scrollTo(0, y)", offset);
+                await page.WaitForTimeoutAsync(250);
+
+                var path = Path.Combine(ScreenshotDirectory, $"{baseName}_slice_{index:D2}.png");
+                await page.ScreenshotAsync(new PageScreenshotOptions
+                {
+                    Path = path,
+                    FullPage = false
+                });
+                Console.WriteLine($"Saved screenshot: {path}");
+
+                index++;
+                if (offset + metrics.ViewportHeight >= metrics.ScrollHeight)
+                {
+                    break;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or PlaywrightException)
+        {
+            Console.WriteLine($"Failed to capture viewport slices: {ex.Message}");
         }
     }
 
@@ -350,6 +466,20 @@ public sealed class StealthIntegrationTests
         public bool HasChrome { get; set; }
         public string WebglVendor { get; set; } = string.Empty;
         public string WebglRenderer { get; set; } = string.Empty;
+    }
+
+    private sealed class SignalSnapshot
+    {
+        public string Url { get; set; } = string.Empty;
+        public string Mode { get; set; } = string.Empty;
+        public DateTimeOffset TimestampUtc { get; set; }
+        public StealthSignals Signals { get; set; } = new();
+    }
+
+    private sealed class ViewportMetrics
+    {
+        public int ScrollHeight { get; set; }
+        public int ViewportHeight { get; set; }
     }
 
     public sealed class GoogleSearchOnlyAttribute : SkipAttribute
