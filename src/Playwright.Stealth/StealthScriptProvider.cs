@@ -31,94 +31,107 @@ internal static class StealthScriptProvider
 
     public static IEnumerable<string> BuildScripts(StealthConfig config)
     {
-        yield return config.BuildOptionsScript();
-        yield return Scripts["utils"];
-        yield return Scripts["generate_magic_arrays"];
+        var scripts = new List<string>
+        {
+            "(function(){",
+            config.BuildOptionsScript(),
+            Scripts["utils"],
+            Scripts["generate_magic_arrays"]
+        };
+
+        void AddWrapped(string scriptKey)
+        {
+            scripts.Add($"(function(){{\n{Scripts[scriptKey]}\n}})();");
+        }
 
         if (config.ChromeApp)
         {
-            yield return Scripts["chrome_app"];
+            AddWrapped("chrome_app");
         }
 
         if (config.ChromeCsi)
         {
-            yield return Scripts["chrome_csi"];
+            AddWrapped("chrome_csi");
         }
 
         if (config.Hairline)
         {
-            yield return Scripts["chrome_hairline"];
+            AddWrapped("chrome_hairline");
         }
 
         if (config.ChromeLoadTimes)
         {
-            yield return Scripts["chrome_load_times"];
+            AddWrapped("chrome_load_times");
         }
 
         if (config.ChromeRuntime)
         {
-            yield return Scripts["chrome_runtime"];
+            AddWrapped("chrome_runtime");
         }
 
         if (config.IframeContentWindow)
         {
-            yield return Scripts["iframe_content_window"];
+            AddWrapped("iframe_content_window");
         }
 
         if (config.MediaCodecs)
         {
-            yield return Scripts["media_codecs"];
+            AddWrapped("media_codecs");
         }
 
         if (config.NavigatorLanguages)
         {
-            yield return Scripts["navigator_languages"];
+            AddWrapped("navigator_languages");
         }
 
         if (config.NavigatorPermissions)
         {
-            yield return Scripts["navigator_permissions"];
+            AddWrapped("navigator_permissions");
         }
 
         if (config.NavigatorPlatform)
         {
-            yield return Scripts["navigator_platform"];
+            AddWrapped("navigator_platform");
         }
 
         if (config.NavigatorPlugins)
         {
-            yield return Scripts["navigator_plugins"];
+            AddWrapped("navigator_plugins");
         }
 
         if (config.NavigatorUserAgent)
         {
-            yield return Scripts["navigator_user_agent"];
+            AddWrapped("navigator_user_agent");
         }
 
         if (config.NavigatorVendor)
         {
-            yield return Scripts["navigator_vendor"];
+            AddWrapped("navigator_vendor");
         }
 
         if (config.WebDriver)
         {
-            yield return Scripts["webdriver"];
+            AddWrapped("webdriver");
         }
 
         if (config.OuterDimensions)
         {
-            yield return Scripts["outerdimensions"];
+            AddWrapped("outerdimensions");
         }
 
         if (config.WebglVendor)
         {
-            yield return Scripts["webgl_vendor"];
+            AddWrapped("webgl_vendor");
         }
 
         if (config.NavigatorHardwareConcurrency > 0)
         {
-            yield return Scripts["navigator_hardware_concurrency"];
+            AddWrapped("navigator_hardware_concurrency");
         }
+
+        scripts.Add("})();");
+
+        yield return string.Join("\n;\n", scripts);
     }
 
     private static string LoadScript(string fileName)

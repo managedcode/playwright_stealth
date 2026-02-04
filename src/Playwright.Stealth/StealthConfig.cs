@@ -45,6 +45,6 @@ public sealed class StealthConfig
             ["navigator_hardware_concurrency"] = NavigatorHardwareConcurrency
         };
 
-        return $"const opts = {JsonSerializer.Serialize(payload)}";
+        return $"const opts = {JsonSerializer.Serialize(payload)};";
     }
 }

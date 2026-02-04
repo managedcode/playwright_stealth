@@ -1,4 +1,4 @@
-generateFunctionMocks = (
+const generateFunctionMocks = (
     proto,
     itemMainProp,
     dataArray

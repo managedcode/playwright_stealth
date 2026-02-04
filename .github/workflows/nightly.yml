@@ -1,10 +1,9 @@
-name: CI
+name: Nightly
 
 on:
-  pull_request:
-    branches: [ main ]
-  push:
-    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -12,7 +11,7 @@ env:
 
 jobs:
   build:
-    name: Build and Test
+    name: Nightly Build and Test
     runs-on: ubuntu-latest
 
     steps:

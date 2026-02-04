@@ -1,4 +1,4 @@
-data = {
+const data = {
     "mimeTypes": [
         {
             "type": "application/pdf",
@@ -47,11 +47,7 @@ data = {
     ]
 }
 
-
-// That means we're running headful
-const hasPlugins = 'plugins' in navigator && navigator.plugins.length
-if (!(hasPlugins)) {
-
+try {
     const mimeTypes = generateMagicArray(
         data.mimeTypes,
         MimeTypeArray.prototype,
@@ -80,13 +76,28 @@ if (!(hasPlugins)) {
         })
     }
 
-    const patchNavigator = (name, value) =>
-        utils.replaceProperty(Object.getPrototypeOf(navigator), name, {
-            get() {
-                return value
-            }
-        })
+    const patchNavigator = (name, value) => {
+        try {
+            utils.replaceProperty(Object.getPrototypeOf(navigator), name, {
+                get() {
+                    return value
+                }
+            })
+            return
+        } catch (err) {
+        }
+
+        try {
+            Object.defineProperty(navigator, name, {
+                get() {
+                    return value
+                }
+            })
+        } catch (err) {
+        }
+    }
 
     patchNavigator('mimeTypes', mimeTypes)
     patchNavigator('plugins', plugins)
+} catch (err) {
 }
