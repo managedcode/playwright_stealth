@@ -63,8 +63,32 @@ public sealed class StealthIntegrationTests
         RunSiteCheckAsync(StealthTestSites.AreYouHeadless, applyStealth: false);
 
     [Test]
+    public Task Incolumitas_Should_Not_Surface_BotSignals() =>
+        RunSiteCheckAsync(StealthTestSites.Incolumitas, applyStealth: true);
+
+    [Test]
+    public Task CreepJs_Should_Not_Surface_BotSignals() =>
+        RunSiteCheckAsync(StealthTestSites.CreepJs, applyStealth: true);
+
+    [Test]
+    public Task DeviceAndBrowserInfo_Should_Not_Surface_BotSignals() =>
+        RunSiteCheckAsync(StealthTestSites.DeviceAndBrowserInfo, applyStealth: true);
+
+    [Test]
     public Task PixelScan_Baseline_Should_Capture_Signals() =>
         RunSiteCheckAsync(StealthTestSites.PixelScan, applyStealth: false);
+
+    [Test]
+    public Task Incolumitas_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.Incolumitas, applyStealth: false);
+
+    [Test]
+    public Task CreepJs_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.CreepJs, applyStealth: false);
+
+    [Test]
+    public Task DeviceAndBrowserInfo_Baseline_Should_Capture_Signals() =>
+        RunSiteCheckAsync(StealthTestSites.DeviceAndBrowserInfo, applyStealth: false);
 
     [Test]
     [GoogleSearchOnly]
@@ -131,7 +155,18 @@ public sealed class StealthIntegrationTests
         await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = MaxParallelTestsForPipeline.Headless,
-            Args = ["--disable-blink-features=AutomationControlled"]
+            Args =
+            [
+                "--disable-blink-features=AutomationControlled",
+                "--disable-default-apps",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-component-update",
+                "--disable-client-side-phishing-detection",
+                "--disable-hang-monitor",
+                "--disable-breakpad",
+                "--metrics-recording-only"
+            ]
         });
 
         await using var context = await browser.NewContextAsync(new BrowserNewContextOptions
@@ -221,6 +256,34 @@ public sealed class StealthIntegrationTests
         await Assert.That(signals.HasChrome).IsTrue();
         await Assert.That(signals.WebglVendor.Length).IsGreaterThan(0);
         await Assert.That(signals.WebglRenderer.Length).IsGreaterThan(0);
+
+        // New assertions: WebGL RENDERER param should not contain SwiftShader
+        await Assert.That(signals.WebglRendererParam.Contains("SwiftShader", StringComparison.OrdinalIgnoreCase)).IsFalse();
+
+        // navigator.connection should exist
+        await Assert.That(signals.HasConnection).IsTrue();
+        await Assert.That(signals.ConnectionType.Length).IsGreaterThan(0);
+
+        // navigator.deviceMemory should be present
+        await Assert.That(signals.DeviceMemory).IsGreaterThan(0);
+
+        // Screen dimensions should be realistic
+        await Assert.That(signals.ScreenWidth).IsGreaterThan(0);
+        await Assert.That(signals.ScreenHeight).IsGreaterThan(0);
+        await Assert.That(signals.ColorDepth).IsGreaterThan(0);
+
+        // Broken image should not show 16x16 (headless artifact)
+        await Assert.That(signals.BrokenImageWidth).IsNotEqualTo(16);
+        await Assert.That(signals.BrokenImageHeight).IsNotEqualTo(16);
+
+        // Touch points should be realistic
+        await Assert.That(signals.MaxTouchPoints).IsGreaterThanOrEqualTo(0);
+
+        // PDF viewer should be enabled
+        await Assert.That(signals.PdfViewerEnabled).IsTrue();
+
+        // No automation properties should be present
+        await Assert.That(signals.HasAutomationProps).IsFalse();
     }
 
     private static async Task PrimePageAsync(IPage page)
@@ -303,6 +366,22 @@ public sealed class StealthIntegrationTests
                 const webglVendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : '';
                 const webglRenderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
 
+                // Check WebGL RENDERER param (7937) for ANGLE/SwiftShader leaks
+                const webglRendererParam = gl ? gl.getParameter(7937) : '';
+
+                // Check broken image dimensions
+                let brokenImageWidth = -1;
+                let brokenImageHeight = -1;
+                try {
+                    const img = new Image();
+                    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+                    // Use a non-existent URL to test broken image
+                    const brokenImg = document.createElement('img');
+                    brokenImg.src = 'https://non-existent-domain-stealth-test.invalid/broken.png';
+                    brokenImageWidth = brokenImg.width;
+                    brokenImageHeight = brokenImg.height;
+                } catch (e) {}
+
                 const signals = {
                     webDriver: navigator.webdriver === true,
                     pluginCount: navigator.plugins ? navigator.plugins.length : 0,
@@ -313,7 +392,21 @@ public sealed class StealthIntegrationTests
                     platform: navigator.platform || '',
                     hasChrome: typeof window.chrome !== 'undefined',
                     webglVendor: webglVendor || '',
-                    webglRenderer: webglRenderer || ''
+                    webglRenderer: webglRenderer || '',
+                    webglRendererParam: webglRendererParam || '',
+                    hasConnection: typeof navigator.connection !== 'undefined',
+                    connectionType: (navigator.connection && navigator.connection.effectiveType) || '',
+                    deviceMemory: navigator.deviceMemory || 0,
+                    screenWidth: screen.width || 0,
+                    screenHeight: screen.height || 0,
+                    colorDepth: screen.colorDepth || 0,
+                    brokenImageWidth: brokenImageWidth,
+                    brokenImageHeight: brokenImageHeight,
+                    maxTouchPoints: navigator.maxTouchPoints || 0,
+                    pdfViewerEnabled: navigator.pdfViewerEnabled === true,
+                    hasAutomationProps: (typeof window.cdc_adoQpoasnfa76pfcZLmcfl_Array !== 'undefined') ||
+                                       (typeof window.domAutomationController !== 'undefined') ||
+                                       (typeof window.__webdriver_script_fn !== 'undefined')
                 };
 
                 document.documentElement.setAttribute('{{SignalAttributeName}}', JSON.stringify(signals));
@@ -466,6 +559,18 @@ public sealed class StealthIntegrationTests
         public bool HasChrome { get; set; }
         public string WebglVendor { get; set; } = string.Empty;
         public string WebglRenderer { get; set; } = string.Empty;
+        public string WebglRendererParam { get; set; } = string.Empty;
+        public bool HasConnection { get; set; }
+        public string ConnectionType { get; set; } = string.Empty;
+        public int DeviceMemory { get; set; }
+        public int ScreenWidth { get; set; }
+        public int ScreenHeight { get; set; }
+        public int ColorDepth { get; set; }
+        public int BrokenImageWidth { get; set; }
+        public int BrokenImageHeight { get; set; }
+        public int MaxTouchPoints { get; set; }
+        public bool PdfViewerEnabled { get; set; }
+        public bool HasAutomationProps { get; set; }
     }
 
     private sealed class SignalSnapshot

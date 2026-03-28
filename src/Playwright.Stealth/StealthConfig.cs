@@ -22,6 +22,18 @@ public sealed class StealthConfig
     public bool NavigatorVendor { get; init; } = true;
     public bool OuterDimensions { get; init; } = true;
     public bool Hairline { get; init; } = true;
+    public bool BrokenImage { get; init; } = true;
+    public bool NavigatorConnection { get; init; } = true;
+    public int NavigatorDeviceMemory { get; init; } = 8;
+    public bool SpeechSynthesis { get; init; } = true;
+    public bool ScreenDimensions { get; init; } = true;
+    public bool CdpDetection { get; init; } = true;
+    public bool AutomationProperties { get; init; } = true;
+    public int NavigatorMaxTouchPoints { get; init; } = 1;
+    public bool CanvasFingerprint { get; init; } = true;
+    public bool PerformanceJitter { get; init; } = true;
+    public bool NavigatorPdfViewer { get; init; } = true;
+    public bool AudioContext { get; init; } = true;
 
     public string Vendor { get; init; } = "Intel Inc.";
     public string Renderer { get; init; } = "Intel Iris OpenGL Engine";
@@ -42,7 +54,11 @@ public sealed class StealthConfig
             ["navigator_user_agent"] = NavigatorUserAgentValue,
             ["languages"] = Languages,
             ["runOnInsecureOrigins"] = RunOnInsecureOrigins,
-            ["navigator_hardware_concurrency"] = NavigatorHardwareConcurrency
+            ["navigator_hardware_concurrency"] = NavigatorHardwareConcurrency,
+            ["ua_patch_prefix"] = "Headless",
+            ["ua_patch_suffix"] = "/",
+            ["navigator_device_memory"] = NavigatorDeviceMemory,
+            ["max_touch_points"] = NavigatorMaxTouchPoints
         };
 
         return $"const opts = {JsonSerializer.Serialize(payload)};";

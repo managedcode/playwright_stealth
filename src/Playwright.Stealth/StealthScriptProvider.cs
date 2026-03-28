@@ -26,7 +26,19 @@ internal static class StealthScriptProvider
         ["outerdimensions"] = LoadScript("window.outerdimensions.js"),
         ["utils"] = LoadScript("utils.js"),
         ["webdriver"] = LoadScript("navigator.webdriver.js"),
-        ["webgl_vendor"] = LoadScript("webgl.vendor.js")
+        ["webgl_vendor"] = LoadScript("webgl.vendor.js"),
+        ["broken_image"] = LoadScript("broken.image.js"),
+        ["navigator_connection"] = LoadScript("navigator.connection.js"),
+        ["navigator_device_memory"] = LoadScript("navigator.deviceMemory.js"),
+        ["speech_synthesis"] = LoadScript("speech.synthesis.js"),
+        ["screen_dimensions"] = LoadScript("screen.dimensions.js"),
+        ["cdp_detection"] = LoadScript("cdp.detection.js"),
+        ["automation_properties"] = LoadScript("automation.properties.js"),
+        ["navigator_touch_points"] = LoadScript("navigator.touchPoints.js"),
+        ["canvas_fingerprint"] = LoadScript("canvas.fingerprint.js"),
+        ["performance_jitter"] = LoadScript("performance.jitter.js"),
+        ["navigator_pdf_viewer"] = LoadScript("navigator.pdfViewer.js"),
+        ["audio_context"] = LoadScript("audio.context.js")
     };
 
     public static IEnumerable<string> BuildScripts(StealthConfig config)
@@ -127,6 +139,66 @@ internal static class StealthScriptProvider
         if (config.NavigatorHardwareConcurrency > 0)
         {
             AddWrapped("navigator_hardware_concurrency");
+        }
+
+        if (config.BrokenImage)
+        {
+            AddWrapped("broken_image");
+        }
+
+        if (config.NavigatorConnection)
+        {
+            AddWrapped("navigator_connection");
+        }
+
+        if (config.NavigatorDeviceMemory > 0)
+        {
+            AddWrapped("navigator_device_memory");
+        }
+
+        if (config.SpeechSynthesis)
+        {
+            AddWrapped("speech_synthesis");
+        }
+
+        if (config.ScreenDimensions)
+        {
+            AddWrapped("screen_dimensions");
+        }
+
+        if (config.CdpDetection)
+        {
+            AddWrapped("cdp_detection");
+        }
+
+        if (config.AutomationProperties)
+        {
+            AddWrapped("automation_properties");
+        }
+
+        if (config.NavigatorMaxTouchPoints >= 0)
+        {
+            AddWrapped("navigator_touch_points");
+        }
+
+        if (config.CanvasFingerprint)
+        {
+            AddWrapped("canvas_fingerprint");
+        }
+
+        if (config.PerformanceJitter)
+        {
+            AddWrapped("performance_jitter");
+        }
+
+        if (config.NavigatorPdfViewer)
+        {
+            AddWrapped("navigator_pdf_viewer");
+        }
+
+        if (config.AudioContext)
+        {
+            AddWrapped("audio_context");
         }
 
         scripts.Add("})();");
