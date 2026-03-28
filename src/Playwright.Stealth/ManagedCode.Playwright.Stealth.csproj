@@ -3,8 +3,8 @@
   <PropertyGroup>
     <PackageId>ManagedCode.Playwright.Stealth</PackageId>
     <Title>ManagedCode.Playwright.Stealth</Title>
-    <Description>Stealth tweaks for Microsoft.Playwright.</Description>
-    <PackageTags>playwright;stealth;bot-detection</PackageTags>
+    <Description>Stealth evasion library for Microsoft.Playwright (.NET). Applies 31 init-script patches that mask headless Chrome fingerprints — navigator properties, WebGL, canvas, audio, CDP traces, automation markers and more. Validated against 9 public bot-detection sites.</Description>
+    <PackageTags>playwright;stealth;bot-detection;headless;fingerprint;anti-detect;web-scraping;automation</PackageTags>
     <RootNamespace>ManagedCode.Playwright.Stealth</RootNamespace>
     <AssemblyName>ManagedCode.Playwright.Stealth</AssemblyName>
   </PropertyGroup>
