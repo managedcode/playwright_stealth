@@ -83,5 +83,165 @@ try {
             }
         }
     } catch (e) {}
+
+    // CDP/devtools detectors time or inspect serialization of console arguments.
+    // Keep normal console behavior, but avoid handing known probe shapes to the protocol.
+    try {
+        const consoleMethods = [
+            'assert',
+            'debug',
+            'dir',
+            'dirxml',
+            'error',
+            'info',
+            'log',
+            'table',
+            'trace',
+            'warn'
+        ]
+        const getObjectTag = value => {
+            try {
+                return Object.prototype.toString.call(value)
+            } catch (e) {
+                return ''
+            }
+        }
+
+        const isObjectLike = value =>
+            !!value && (typeof value === 'object' || typeof value === 'function')
+
+        const isErrorLike = value => {
+            if (!isObjectLike(value)) {
+                return false
+            }
+
+            try {
+                const tag = getObjectTag(value)
+                return value instanceof Error ||
+                    tag === '[object Error]' ||
+                    tag === '[object DOMException]'
+            } catch (e) {
+                return false
+            }
+        }
+
+        const hasOwnAccessorNamed = (value, propertyNames) => {
+            if (!isObjectLike(value)) {
+                return false
+            }
+
+            try {
+                return propertyNames.some(propertyName => {
+                    const descriptor = Object.getOwnPropertyDescriptor(value, propertyName)
+                    return !!descriptor &&
+                        (typeof descriptor.get === 'function' || typeof descriptor.set === 'function')
+                })
+            } catch (e) {
+                return false
+            }
+        }
+
+        const hasConsoleAccessorProbe = value =>
+            isErrorLike(value) && hasOwnAccessorNamed(value, ['stack', 'name', 'message'])
+
+        const hasOwnToStringOverride = value => {
+            if (!isObjectLike(value)) {
+                return false
+            }
+
+            try {
+                const descriptor = Object.getOwnPropertyDescriptor(value, 'toString')
+                return !!descriptor && typeof descriptor.value === 'function'
+            } catch (e) {
+                return false
+            }
+        }
+
+        const hasKnownToStringProbe = value => {
+            if (!hasOwnToStringOverride(value)) {
+                return false
+            }
+
+            const tag = getObjectTag(value)
+            return typeof value === 'function' ||
+                tag === '[object RegExp]' ||
+                tag === '[object Date]' ||
+                tag === '[object Error]'
+        }
+
+        const hasNestedKnownToStringProbe = value => {
+            if (!isObjectLike(value)) {
+                return false
+            }
+
+            try {
+                return Object.getOwnPropertyNames(value).some(propertyName => {
+                    const descriptor = Object.getOwnPropertyDescriptor(value, propertyName)
+                    return !!descriptor &&
+                        Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+                        hasKnownToStringProbe(descriptor.value)
+                })
+            } catch (e) {
+                return false
+            }
+        }
+
+        const isLargeTabularPayload = value => {
+            if (!value || typeof value !== 'object' || !Array.isArray(value) || value.length < 25) {
+                return false
+            }
+
+            try {
+                const first = value[0]
+                return !!first &&
+                    typeof first === 'object' &&
+                    Object.getOwnPropertyNames(first).length >= 100
+            } catch (e) {
+                return false
+            }
+        }
+
+        const readStringDataProperty = (value, propertyName) => {
+            try {
+                const descriptor = Object.getOwnPropertyDescriptor(value, propertyName)
+                return !!descriptor &&
+                    Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+                    typeof descriptor.value === 'string'
+                    ? descriptor.value
+                    : ''
+            } catch (e) {
+                return ''
+            }
+        }
+
+        const sanitizeConsoleArg = value => {
+            if (isLargeTabularPayload(value)) {
+                return '[object Array]'
+            }
+
+            if (hasKnownToStringProbe(value) || hasNestedKnownToStringProbe(value)) {
+                return Object.prototype.toString.call(value)
+            }
+
+            if (!hasConsoleAccessorProbe(value)) {
+                return value
+            }
+
+            const name = readStringDataProperty(value, 'name') || 'Error'
+            const messageValue = readStringDataProperty(value, 'message')
+            const message = messageValue ? `: ${messageValue}` : ''
+            return `${name}${message}`
+        }
+
+        for (const method of consoleMethods) {
+            if (typeof console[method] === 'function') {
+                utils.replaceWithProxy(console, method, {
+                    apply(target, ctx, args) {
+                        return utils.cache.Reflect.apply(target, ctx, args.map(sanitizeConsoleArg))
+                    }
+                })
+            }
+        }
+    } catch (e) {}
 } catch (err) {
 }

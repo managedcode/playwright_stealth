@@ -1,11 +1,10 @@
 try {
-    const proto = Object.getPrototypeOf(navigator)
-    const descriptor = Object.getOwnPropertyDescriptor(proto, 'vendor')
-
-    if (descriptor && descriptor.configurable) {
-        Object.defineProperty(proto, 'vendor', {
-            get: () => opts.navigator_vendor || 'Google Inc.',
-        })
+    const targetVendor = opts.navigator_vendor || 'Google Inc.'
+    if (navigator.vendor === targetVendor) {
+        return
     }
+
+    const proto = Object.getPrototypeOf(navigator)
+    utils.replaceGetter(proto, 'vendor', targetVendor)
 } catch (err) {
 }

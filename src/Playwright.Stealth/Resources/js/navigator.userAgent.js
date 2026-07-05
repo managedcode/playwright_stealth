@@ -15,16 +15,12 @@ try {
         ? opts.navigator_user_agent.replace(/Mozilla\//, '')
         : current_app_version.split(search_str).join(replace_str)
 
-    if (ua_descriptor && ua_descriptor.configurable) {
-        Object.defineProperty(proto, 'userAgent', {
-            get: () => patched_ua
-        })
+    if (patched_ua !== current_ua && ua_descriptor && ua_descriptor.configurable) {
+        utils.replaceGetter(proto, 'userAgent', patched_ua)
     }
 
-    if (app_version_descriptor && app_version_descriptor.configurable) {
-        Object.defineProperty(proto, 'appVersion', {
-            get: () => patched_app_version
-        })
+    if (patched_app_version !== current_app_version && app_version_descriptor && app_version_descriptor.configurable) {
+        utils.replaceGetter(proto, 'appVersion', patched_app_version)
     }
 } catch (err) {
 }

@@ -13,7 +13,7 @@ public sealed class StealthConfig
     public bool ChromeRuntime { get; init; } = true;
     public bool IframeContentWindow { get; init; } = true;
     public bool MediaCodecs { get; init; } = true;
-    public int NavigatorHardwareConcurrency { get; init; } = 4;
+    public int NavigatorHardwareConcurrency { get; init; }
     public bool NavigatorLanguages { get; init; } = true;
     public bool NavigatorPermissions { get; init; } = true;
     public bool NavigatorPlatform { get; init; } = true;
@@ -24,12 +24,12 @@ public sealed class StealthConfig
     public bool Hairline { get; init; } = true;
     public bool BrokenImage { get; init; } = true;
     public bool NavigatorConnection { get; init; } = true;
-    public int NavigatorDeviceMemory { get; init; } = 8;
+    public int NavigatorDeviceMemory { get; init; }
     public bool SpeechSynthesis { get; init; } = true;
     public bool ScreenDimensions { get; init; } = true;
     public bool CdpDetection { get; init; } = true;
     public bool AutomationProperties { get; init; } = true;
-    public int NavigatorMaxTouchPoints { get; init; } = 1;
+    public int NavigatorMaxTouchPoints { get; init; } = -1;
     public bool CanvasFingerprint { get; init; } = true;
     public bool PerformanceJitter { get; init; } = true;
     public bool NavigatorPdfViewer { get; init; } = true;
@@ -40,7 +40,7 @@ public sealed class StealthConfig
     public string NavigatorVendorValue { get; init; } = "Google Inc.";
     public string? NavigatorUserAgentValue { get; init; }
     public string? NavigatorPlatformValue { get; init; }
-    public IReadOnlyList<string> Languages { get; init; } = new[] { "en-US", "en" };
+    public IReadOnlyList<string> Languages { get; init; } = [];
     public bool? RunOnInsecureOrigins { get; init; }
 
     internal string BuildOptionsScript()

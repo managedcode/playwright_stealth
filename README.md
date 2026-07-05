@@ -85,23 +85,23 @@ await context.ApplyStealthAsync(config);
 
 ## Patched Signals
 
-The default configuration patches **31 detection vectors** across these categories:
+The configuration can patch **31 detection vectors** across these categories. Defaults preserve native navigator values where current Chromium already exposes a normal value.
 
 ### Navigator Properties
 | Patch | Description | Config |
 |-------|-------------|--------|
 | `navigator.webdriver` | Returns `false` instead of `true` | `WebDriver` |
 | `navigator.plugins` / `mimeTypes` | Fake plugin array (Chrome PDF Plugin, etc.) | `NavigatorPlugins` |
-| `navigator.languages` | Configurable language array | `NavigatorLanguages` |
+| `navigator.languages` | Preserves native values by default; configurable language array when supplied | `NavigatorLanguages` |
 | `navigator.userAgent` | Strips headless markers from UA string | `NavigatorUserAgent` |
-| `navigator.vendor` | Returns "Google Inc." | `NavigatorVendor` |
+| `navigator.vendor` | Preserves native value when already "Google Inc."; configurable otherwise | `NavigatorVendor` |
 | `navigator.platform` | Configurable platform string | `NavigatorPlatform` |
-| `navigator.hardwareConcurrency` | Configurable CPU core count (default: 4) | `NavigatorHardwareConcurrency` |
-| `navigator.deviceMemory` | Configurable device memory in GB (default: 8) | `NavigatorDeviceMemory` |
-| `navigator.connection` | Full NetworkInformation API mock (4g, 10 Mbps) | `NavigatorConnection` |
+| `navigator.hardwareConcurrency` | Preserves native value by default; configurable CPU core count when supplied | `NavigatorHardwareConcurrency` |
+| `navigator.deviceMemory` | Preserves native value by default; configurable device memory in GB when supplied | `NavigatorDeviceMemory` |
+| `navigator.connection` | Preserves native value when present; mocks NetworkInformation when missing | `NavigatorConnection` |
 | `navigator.permissions` | Normalizes Notification permission state | `NavigatorPermissions` |
-| `navigator.maxTouchPoints` | Configurable touch point count (default: 1) | `NavigatorMaxTouchPoints` |
-| `navigator.pdfViewerEnabled` | Returns `true` | `NavigatorPdfViewer` |
+| `navigator.maxTouchPoints` | Preserves native value by default; configurable touch point count when supplied | `NavigatorMaxTouchPoints` |
+| `navigator.pdfViewerEnabled` | Preserves native value when present; mocks it when missing | `NavigatorPdfViewer` |
 
 ### Chrome APIs
 | Patch | Description | Config |
@@ -109,7 +109,7 @@ The default configuration patches **31 detection vectors** across these categori
 | `window.chrome` / `chrome.runtime` | Full Chrome extension API mock | `ChromeRuntime` |
 | `chrome.app` | Chrome App API mock | `ChromeApp` |
 | `chrome.csi` | Chrome CSI timing mock | `ChromeCsi` |
-| `chrome.loadTimes` | Chrome load times mock | `ChromeLoadTimes` |
+| `chrome.loadTimes` | Preserves the native headful API when present; mocks it when missing | `ChromeLoadTimes` |
 
 ### Graphics & Rendering
 | Patch | Description | Config |
@@ -182,9 +182,9 @@ string[] args = PlaywrightStealthExtensions.StealthArgs;
 
 ### Numeric Options (int)
 
-- `NavigatorHardwareConcurrency` (default: 4, set 0 to disable)
-- `NavigatorDeviceMemory` (default: 8, set 0 to disable)
-- `NavigatorMaxTouchPoints` (default: 1, set -1 to disable)
+- `NavigatorHardwareConcurrency` (default: 0 to preserve native value, set >0 to spoof)
+- `NavigatorDeviceMemory` (default: 0 to preserve native value, set >0 to spoof)
+- `NavigatorMaxTouchPoints` (default: -1 to preserve native value, set >=0 to spoof)
 
 ### String Options
 
@@ -193,7 +193,7 @@ string[] args = PlaywrightStealthExtensions.StealthArgs;
 - `NavigatorVendorValue` - Vendor name (default: "Google Inc.")
 - `Vendor` - WebGL vendor (default: "Intel Inc.")
 - `Renderer` - WebGL renderer (default: "Intel Iris OpenGL Engine")
-- `Languages` - Language array (default: `["en-US", "en"]`)
+- `Languages` - Language array (default: empty to preserve native values)
 - `RunOnInsecureOrigins` - Allow stealth on http:// origins
 
 ## Testing

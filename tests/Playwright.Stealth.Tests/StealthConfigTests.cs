@@ -15,7 +15,10 @@ public sealed class StealthConfigTests
         await Assert.That(config.WebDriver).IsTrue();
         await Assert.That(config.WebglVendor).IsTrue();
         await Assert.That(config.NavigatorLanguages).IsTrue();
-        await Assert.That(config.NavigatorHardwareConcurrency).IsGreaterThan(0);
+        await Assert.That(config.NavigatorHardwareConcurrency).IsEqualTo(0);
+        await Assert.That(config.NavigatorDeviceMemory).IsEqualTo(0);
+        await Assert.That(config.NavigatorMaxTouchPoints).IsEqualTo(-1);
+        await Assert.That(config.Languages.Count).IsEqualTo(0);
     }
 
     [Test]

@@ -11,7 +11,7 @@ if (!window.chrome) {
 
 // That means we're running headful and don't need to mock anything
 if ('loadTimes' in window.chrome) {
-    throw new Error('skipping chrome loadtimes update, running in headfull mode')
+    return
 }
 
 // Check that the Navigation Timing API v1 + v2 is available, we need that

@@ -2,6 +2,10 @@
 // Headless Chrome may expose missing or inconsistent connection info
 try {
     if (typeof navigator !== 'undefined') {
+        if ('connection' in navigator) {
+            return
+        }
+
         const connectionData = {
             effectiveType: '4g',
             downlink: 10,
@@ -39,15 +43,7 @@ try {
 
         const connection = new Proxy(connectionProto, handler)
 
-        const proto = Object.getPrototypeOf(navigator)
-        const existingDescriptor = Object.getOwnPropertyDescriptor(proto, 'connection')
-        if (!existingDescriptor || existingDescriptor.configurable) {
-            Object.defineProperty(proto, 'connection', {
-                get: () => connection,
-                configurable: true,
-                enumerable: true
-            })
-        }
+        utils.replaceGetter(Object.getPrototypeOf(navigator), 'connection', connection)
     }
 } catch (err) {
 }

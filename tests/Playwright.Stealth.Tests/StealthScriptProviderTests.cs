@@ -17,22 +17,39 @@ public sealed class StealthScriptProviderTests
         await Assert.That(ContainsScript(scripts, "const utils")).IsTrue();
         await Assert.That(ContainsScript(scripts, "generateMagicArray")).IsTrue();
         await Assert.That(ContainsScript(scripts, "Object.defineProperty(Object.getPrototypeOf(navigator), 'webdriver'")).IsTrue();
-        await Assert.That(ContainsScript(scripts, "defineProperty(proto, 'languages'")).IsTrue();
+        await Assert.That(ContainsScript(scripts, "opts.languages && opts.languages.length > 0")).IsTrue();
         await Assert.That(ContainsScript(scripts, "HeadlessChrome")).IsFalse();
         await Assert.That(ContainsScript(scripts, "ua_patch_prefix")).IsTrue();
-        await Assert.That(ContainsScript(scripts, "patchNavigator('hardwareConcurrency'")).IsTrue();
-        await Assert.That(ContainsScript(scripts, "defineProperty(proto, 'deviceMemory'")).IsTrue();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'hardwareConcurrency'")).IsFalse();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'deviceMemory'")).IsFalse();
         await Assert.That(ContainsScript(scripts, "effectiveType")).IsTrue();
         await Assert.That(ContainsScript(scripts, "HTMLImageElement.prototype")).IsTrue();
         await Assert.That(ContainsScript(scripts, "speechSynthesis")).IsTrue();
         await Assert.That(ContainsScript(scripts, "screen_width")).IsTrue();
         await Assert.That(ContainsScript(scripts, "__cdp_binding__")).IsTrue();
         await Assert.That(ContainsScript(scripts, "automationPatterns")).IsTrue();
-        await Assert.That(ContainsScript(scripts, "maxTouchPoints")).IsTrue();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'maxTouchPoints'")).IsFalse();
         await Assert.That(ContainsScript(scripts, "noiseSeed")).IsTrue();
         await Assert.That(ContainsScript(scripts, "requestAnimationFrame")).IsTrue();
         await Assert.That(ContainsScript(scripts, "pdfViewerEnabled")).IsTrue();
         await Assert.That(ContainsScript(scripts, "AudioContext")).IsTrue();
+    }
+
+    [Test]
+    public async Task BuildScripts_Should_Include_Explicit_Navigator_Spoofs()
+    {
+        var scripts = StealthScriptProvider.BuildScripts(new StealthConfig
+        {
+            NavigatorHardwareConcurrency = 12,
+            NavigatorDeviceMemory = 16,
+            NavigatorMaxTouchPoints = 1,
+            Languages = ["en-US", "en"]
+        }).ToList();
+
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'hardwareConcurrency'")).IsTrue();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'deviceMemory'")).IsTrue();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'maxTouchPoints'")).IsTrue();
+        await Assert.That(ContainsScript(scripts, "opts.languages && opts.languages.length > 0")).IsTrue();
     }
 
     [Test]
@@ -62,11 +79,11 @@ public sealed class StealthScriptProviderTests
         var scripts = StealthScriptProvider.BuildScripts(config).ToList();
 
         await Assert.That(ContainsScript(scripts, "Object.defineProperty(Object.getPrototypeOf(navigator), 'webdriver'")).IsFalse();
-        await Assert.That(ContainsScript(scripts, "defineProperty(proto, 'languages'")).IsFalse();
+        await Assert.That(ContainsScript(scripts, "opts.languages && opts.languages.length > 0")).IsFalse();
         await Assert.That(ContainsScript(scripts, "HeadlessChrome")).IsFalse();
-        await Assert.That(ContainsScript(scripts, "patchNavigator('hardwareConcurrency'")).IsFalse();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'hardwareConcurrency'")).IsFalse();
         await Assert.That(ContainsScript(scripts, "UNMASKED_VENDOR_WEBGL")).IsFalse();
-        await Assert.That(ContainsScript(scripts, "defineProperty(proto, 'deviceMemory'")).IsFalse();
+        await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'deviceMemory'")).IsFalse();
         await Assert.That(ContainsScript(scripts, "effectiveType")).IsFalse();
         await Assert.That(ContainsScript(scripts, "HTMLImageElement.prototype")).IsFalse();
         await Assert.That(ContainsScript(scripts, "speechSynthesis")).IsFalse();

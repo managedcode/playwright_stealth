@@ -48,6 +48,15 @@ const data = {
 }
 
 try {
+    if (
+        navigator.plugins &&
+        navigator.plugins.length > 0 &&
+        navigator.mimeTypes &&
+        navigator.mimeTypes.length > 0
+    ) {
+        return
+    }
+
     const mimeTypes = generateMagicArray(
         data.mimeTypes,
         MimeTypeArray.prototype,
@@ -76,28 +85,7 @@ try {
         })
     }
 
-    const patchNavigator = (name, value) => {
-        try {
-            utils.replaceProperty(Object.getPrototypeOf(navigator), name, {
-                get() {
-                    return value
-                }
-            })
-            return
-        } catch (err) {
-        }
-
-        try {
-            Object.defineProperty(navigator, name, {
-                get() {
-                    return value
-                }
-            })
-        } catch (err) {
-        }
-    }
-
-    patchNavigator('mimeTypes', mimeTypes)
-    patchNavigator('plugins', plugins)
+    utils.replaceGetter(Object.getPrototypeOf(navigator), 'mimeTypes', mimeTypes)
+    utils.replaceGetter(Object.getPrototypeOf(navigator), 'plugins', plugins)
 } catch (err) {
 }

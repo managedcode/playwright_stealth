@@ -126,6 +126,53 @@ utils.replaceProperty = (obj, propName, descriptorOverrides = {}) => {
   })
 }
 
+utils.replaceGetterWithProxy = (obj, propName, handler) => {
+  const descriptor = Object.getOwnPropertyDescriptor(obj, propName)
+  if (!descriptor || !descriptor.configurable || typeof descriptor.get !== 'function') {
+    return false
+  }
+
+  utils.preloadCache()
+  const proxyObj = new Proxy(descriptor.get, utils.stripProxyFromErrors(handler))
+  utils.replaceProperty(obj, propName, { get: proxyObj })
+  utils.redirectToString(proxyObj, descriptor.get)
+
+  return true
+}
+
+utils.replaceGetter = (obj, propName, valueFactory) => {
+  const getter = () =>
+    typeof valueFactory === 'function'
+      ? valueFactory()
+      : valueFactory
+
+  if (utils.replaceGetterWithProxy(obj, propName, {
+    apply() {
+      return getter()
+    }
+  })) {
+    return true
+  }
+
+  const descriptor = Object.getOwnPropertyDescriptor(obj, propName)
+  if (descriptor && !descriptor.configurable) {
+    return false
+  }
+
+  const nativeGetter = function() {
+    return getter()
+  }
+  utils.patchToString(nativeGetter, `function get ${propName}() { [native code] }`)
+  Object.defineProperty(obj, propName, {
+    ...(descriptor || {}),
+    get: nativeGetter,
+    enumerable: descriptor ? descriptor.enumerable : true,
+    configurable: true
+  })
+
+  return true
+}
+
 /**
  * Preload a cache of function copies and data.
  *

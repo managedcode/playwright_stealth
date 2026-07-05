@@ -1,14 +1,10 @@
-// Ensure navigator.pdfViewerEnabled returns true
-// Headless Chrome may report false or undefined for PDF viewer support
+// Preserve native navigator.pdfViewerEnabled when present; mock it only when missing.
 try {
-    const proto = Object.getPrototypeOf(navigator)
-    const descriptor = Object.getOwnPropertyDescriptor(proto, 'pdfViewerEnabled')
-    if (!descriptor || descriptor.configurable) {
-        Object.defineProperty(proto, 'pdfViewerEnabled', {
-            get: () => true,
-            configurable: true,
-            enumerable: true
-        })
+    if ('pdfViewerEnabled' in navigator) {
+        return
     }
+
+    const proto = Object.getPrototypeOf(navigator)
+    utils.replaceGetter(proto, 'pdfViewerEnabled', true)
 } catch (err) {
 }
