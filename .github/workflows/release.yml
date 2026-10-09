@@ -40,7 +40,7 @@ jobs:
       run: dotnet build ManagedCode.Playwright.Stealth.slnx --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --solution ManagedCode.Playwright.Stealth.slnx --configuration Release --no-build --verbosity normal
+      run: xvfb-run --auto-servernum dotnet test --solution ManagedCode.Playwright.Stealth.slnx --configuration Release --no-build --verbosity normal
 
     - name: Pack NuGet packages
       run: dotnet pack --configuration Release --no-build --output ./artifacts

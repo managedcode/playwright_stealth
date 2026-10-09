@@ -16,32 +16,6 @@ try {
         } catch (e) {}
     }
 
-    // Mask the Debugger detection via Error stack traces
-    // CDP leaves traces in error stack that mention DevTools protocol
-    const originalError = Error
-    const originalCaptureStackTrace = Error.captureStackTrace
-    if (originalCaptureStackTrace) {
-        Error.captureStackTrace = function(targetObject, constructorOpt) {
-            originalCaptureStackTrace.call(Error, targetObject, constructorOpt)
-            if (targetObject && targetObject.stack) {
-                // Remove any CDP/DevTools references from stack traces
-                targetObject.stack = targetObject.stack
-                    .split('\n')
-                    .filter(line => {
-                        const lower = line.toLowerCase()
-                        return !lower.includes('devtools') &&
-                               !lower.includes('__puppeteer') &&
-                               !lower.includes('__playwright') &&
-                               !lower.includes('__cdp')
-                    })
-                    .join('\n')
-            }
-        }
-        try {
-            utils.patchToString(Error.captureStackTrace, 'function captureStackTrace() { [native code] }')
-        } catch (e) {}
-    }
-
     // Prevent detection via console._commandLineAPI or console.__proto__
     // CDP exposes extra console methods
     try {
@@ -50,13 +24,13 @@ try {
         }
     } catch (e) {}
 
-    // Mask window.Playwright detection
+    // Mask globalThis.Playwright detection
     try {
-        if (typeof window.__playwright !== 'undefined') {
-            delete window.__playwright
+        if (typeof globalThis.__playwright !== 'undefined') {
+            delete globalThis.__playwright
         }
-        if (typeof window.__pw_manual !== 'undefined') {
-            delete window.__pw_manual
+        if (typeof globalThis.__pw_manual !== 'undefined') {
+            delete globalThis.__pw_manual
         }
     } catch (e) {}
 

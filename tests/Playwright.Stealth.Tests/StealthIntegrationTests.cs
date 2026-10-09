@@ -93,6 +93,157 @@ public sealed class StealthIntegrationTests
         RunSiteCheckAsync(StealthTestSites.DeviceAndBrowserInfo, applyStealth: false);
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task Iphey_BrowserAssessment_DoesNotReportErrors(bool headless) =>
+        RunFeedbackCheckAsync(StealthTestSites.Iphey, headless);
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task DeviceAndBrowserInfo_BotAssessment_ReportsHuman(bool headless) =>
+        RunFeedbackCheckAsync(StealthTestSites.DeviceAndBrowserBotCheck, headless);
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task DeviceAndBrowserInfo_BotAssessment_ReportsNoAutomationSignals(bool headless) =>
+        RunFeedbackCheckAsync(StealthTestSites.DeviceAndBrowserBotCheck, headless, requireHumanVerdict: false);
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task CreepJs_PrototypeAssessment_ReportsNoLies(bool headless) =>
+        RunFeedbackCheckAsync(StealthTestSites.CreepJsPrototype, headless);
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task CreepJs_HeadlessAssessment_ReportsNoHeadlessOrStealthSignals(bool headless) =>
+        RunFeedbackCheckAsync(StealthTestSites.CreepJs, headless);
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task Incolumitas_WorkerAssessment_MatchesPageNavigator(bool headless) =>
+        RunFeedbackCheckAsync(StealthTestSites.Incolumitas, headless);
+
+    private static async Task RunFeedbackCheckAsync(string url, bool headless, bool requireHumanVerdict = true)
+    {
+        if (url == StealthTestSites.Iphey && OperatingSystem.IsMacOS()
+            && Environment.GetEnvironmentVariable("RUN_MACOS_IPHEY_TESTS") != "1")
+            throw new TUnit.Core.Exceptions.SkipTestException("Iphey probes optional macOS fonts. Run this regression on Linux; RUN_MACOS_IPHEY_TESTS=1 opts in on a Mac with the necessary fonts already available.");
+
+        await WithPageAsync(true, async page =>
+        {
+            string label = $"feedback_{(headless ? "headless" : "headful")}_{GetScreenshotLabelFromUrl(url)}{(requireHumanVerdict ? string.Empty : "_automation")}";
+            try
+            {
+                await NavigateWithRetriesAsync(page, url);
+                string expression = url switch
+                {
+                    StealthTestSites.DeviceAndBrowserBotCheck => "document.querySelector('#jsonResult')?.textContent.trim()",
+                    StealthTestSites.CreepJsPrototype => "document.querySelector('#fingerprint-data .visitor-info')?.textContent.includes('lies detected')",
+                    StealthTestSites.CreepJs => "document.querySelector('.headless-rating') && document.querySelector('.stealth-rating')",
+                    StealthTestSites.Incolumitas => "document.querySelector('#webWorkerRes')?.textContent.trim().startsWith('{') && document.querySelector('#serviceWorkerRes')?.textContent.trim().startsWith('{')",
+                    StealthTestSites.Iphey => "document.querySelector('#hero-status')?.textContent.trim()",
+                    _ => throw new InvalidOperationException($"No detector assertion for {url}.")
+                };
+                await page.WaitForFunctionAsync($"() => !!({expression})", options: new() { Timeout = NavigationTimeoutMs });
+                string[] failures = await page.EvaluateAsync<string[]>("""
+                    mode => {
+                        const failures = [];
+                        const json = document.querySelector('#jsonResult')?.textContent;
+                        if (json) {
+                            const result = JSON.parse(json);
+                            if (mode === 'automation') {
+                                for (const [signal, detected] of Object.entries(result.details)) {
+                                    if (detected && signal !== 'hasSuspiciousWeakSignals') failures.push(`${signal}: ${detected}`);
+                                }
+                            } else if (result.isBot !== false) failures.push(json);
+                        }
+                        const prototype = document.querySelector('#fingerprint-data .visitor-info')?.textContent;
+                        if (mode === 'prototype' && prototype?.includes('lies detected') && !/\b0 lies detected\b/.test(prototype)) failures.push(prototype.trim());
+                        for (const selector of ['.headless-rating', '.stealth-rating']) {
+                            const text = document.querySelector(selector)?.textContent.trim();
+                            if (text && !text.startsWith('0% ')) failures.push(text);
+                        }
+                        for (const selector of ['#webWorkerRes', '#serviceWorkerRes', '#fp']) {
+                            const text = document.querySelector(selector)?.textContent;
+                            if (!text) continue;
+                            const values = JSON.parse(text);
+                            for (const key of ['userAgent', 'appVersion', 'platform', 'hardwareConcurrency', 'language', 'languages', 'deviceMemory']) {
+                                if (key in values && key in navigator && JSON.stringify(values[key]) !== JSON.stringify(navigator[key])) {
+                                    failures.push(`${selector}: ${key}: ${JSON.stringify(values[key])} != ${JSON.stringify(navigator[key])}`);
+                                }
+                            }
+                        }
+                        const browser = document.querySelector('.browser-tile');
+                        if (mode === 'iphey' && (!browser || browser.classList.contains('code-block--error'))) failures.push('Iphey: browser assessment failed');
+                        return failures;
+                    }
+                    """, requireHumanVerdict ? url switch
+                {
+                    StealthTestSites.CreepJsPrototype => "prototype",
+                    StealthTestSites.Iphey => "iphey",
+                    _ => "verdict"
+                } : "automation");
+                Directory.CreateDirectory(SignalDirectory);
+                await File.WriteAllTextAsync(Path.Combine(SignalDirectory, label + ".json"), JsonSerializer.Serialize(new
+                {
+                    Url = url,
+                    Headless = headless,
+                    Failures = failures,
+                    DetectorText = await page.Locator("body").InnerTextAsync()
+                }, new JsonSerializerOptions { WriteIndented = true }));
+                if (url == StealthTestSites.DeviceAndBrowserBotCheck && requireHumanVerdict && failures.Length > 0)
+                    await SkipIfNativeWeakSignalsAsync(page, label);
+                await Assert.That(failures).IsEmpty();
+            }
+            finally
+            {
+                await CaptureScreenshotAsync(page, label);
+            }
+        }, headless, new() { NavigatorHardwareConcurrency = 18 });
+    }
+
+    private static async Task SkipIfNativeWeakSignalsAsync(IPage page, string label)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        const string Assessment = """
+            () => JSON.stringify({ result: JSON.parse(document.querySelector('#jsonResult').textContent),
+                renderer: window.fingerprint?.webGLRenderer,
+                voices: window.fingerprint?.speechSynthesisVoices.numVoices })
+            """;
+        using JsonDocument assessment = JsonDocument.Parse(await page.EvaluateAsync<string>(Assessment));
+        JsonElement[] detected = assessment.RootElement.GetProperty("result").GetProperty("details")
+            .EnumerateObject().Where(value => value.Value.ValueKind == JsonValueKind.True).Select(value => value.Value).ToArray();
+        JsonElement details = assessment.RootElement.GetProperty("result").GetProperty("details");
+        if (detected.Length != 1 || !details.GetProperty("hasSuspiciousWeakSignals").GetBoolean()
+            || !assessment.RootElement.GetProperty("renderer").GetString()!.Contains("SwiftShader", StringComparison.Ordinal)
+            || assessment.RootElement.GetProperty("voices").GetInt32() != 0) return;
+
+        // Confirm the same environment signal in an untouched context before
+        // marking the full-human verdict unsupported by this machine profile.
+        await using IBrowserContext native = await page.Context.Browser!.NewContextAsync(new()
+        {
+            Locale = CultureInfo.CurrentCulture.Name,
+            ViewportSize = new() { Width = 1920, Height = 1080 },
+            DeviceScaleFactor = 2
+        });
+        IPage baseline = await native.NewPageAsync();
+        await NavigateWithRetriesAsync(baseline, StealthTestSites.DeviceAndBrowserBotCheck);
+        await baseline.WaitForFunctionAsync("() => document.querySelector('#jsonResult')?.textContent.trim()", options: new() { Timeout = NavigationTimeoutMs });
+        string baselineJson = await baseline.EvaluateAsync<string>(Assessment);
+        await File.WriteAllTextAsync(Path.Combine(SignalDirectory, label + "_native.json"), baselineJson);
+        using JsonDocument nativeAssessment = JsonDocument.Parse(baselineJson);
+        if (nativeAssessment.RootElement.GetProperty("result").GetProperty("details").GetProperty("hasSuspiciousWeakSignals").GetBoolean()
+            && nativeAssessment.RootElement.GetProperty("renderer").GetString() == assessment.RootElement.GetProperty("renderer").GetString()
+            && nativeAssessment.RootElement.GetProperty("voices").GetInt32() == 0)
+            throw new TUnit.Core.Exceptions.SkipTestException("Native Linux Chromium also reports hasSuspiciousWeakSignals with SwiftShader and no system voices. All automation checks passed; the full human verdict requires a desktop browser profile. Both assessments were saved.");
+    }
+
+    [Test]
     [GoogleSearchOnly]
     public async Task GoogleSearch_Should_Find_ManagedCode()
     {
@@ -194,25 +345,15 @@ public sealed class StealthIntegrationTests
         });
     }
 
-    private static async Task WithPageAsync(bool applyStealth, Func<IPage, Task> action)
+    private static async Task WithPageAsync(bool applyStealth, Func<IPage, Task> action, bool? headless = null, StealthConfig? config = null)
     {
         await PlaywrightInstall.EnsureInstalledAsync();
         using var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = MaxParallelTestsForPipeline.Headless,
-            Args =
-            [
-                "--disable-blink-features=AutomationControlled",
-                "--disable-default-apps",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-component-update",
-                "--disable-client-side-phishing-detection",
-                "--disable-hang-monitor",
-                "--disable-breakpad",
-                "--metrics-recording-only"
-            ]
+            Headless = headless ?? MaxParallelTestsForPipeline.Headless,
+            Channel = "chromium",
+            Args = PlaywrightStealthExtensions.StealthArgs
         });
 
         await using var context = await browser.NewContextAsync(new BrowserNewContextOptions
@@ -224,7 +365,7 @@ public sealed class StealthIntegrationTests
 
         if (applyStealth)
         {
-            await context.ApplyStealthAsync();
+            await context.ApplyStealthAsync(config);
         }
         var page = await context.NewPageAsync();
         await InstallSignalProbeAsync(page);
@@ -479,13 +620,14 @@ public sealed class StealthIntegrationTests
             await page.ScreenshotAsync(new PageScreenshotOptions
             {
                 Path = path,
-                FullPage = true
+                FullPage = true,
+                Timeout = 15_000
             });
             Console.WriteLine($"Saved screenshot: {path}");
 
             await CaptureViewportSlicesAsync(page, baseName);
         }
-        catch (Exception ex) when (ex is IOException or PlaywrightException)
+        catch (Exception ex) when (ex is IOException or PlaywrightException or TimeoutException)
         {
             Console.WriteLine($"Failed to capture screenshot: {ex.Message}");
         }

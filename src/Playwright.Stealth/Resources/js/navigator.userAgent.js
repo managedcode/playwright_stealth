@@ -13,7 +13,7 @@ try {
     const patched_ua = opts.navigator_user_agent || current_ua.split(search_str).join(replace_str)
     const patched_app_version = opts.navigator_user_agent
         ? opts.navigator_user_agent.replace(/Mozilla\//, '')
-        : current_app_version.split(search_str).join(replace_str)
+        : typeof current_app_version === 'string' ? current_app_version.split(search_str).join(replace_str) : current_app_version
 
     if (patched_ua !== current_ua && ua_descriptor && ua_descriptor.configurable) {
         utils.replaceGetter(proto, 'userAgent', patched_ua)

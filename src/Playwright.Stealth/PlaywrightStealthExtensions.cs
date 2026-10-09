@@ -45,6 +45,8 @@ public static class PlaywrightStealthExtensions
         {
             await context.AddInitScriptAsync(script).ConfigureAwait(false);
         }
+
+        await StealthContextController.ApplyAsync(context, stealthConfig).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -58,9 +60,13 @@ public static class PlaywrightStealthExtensions
         BrowserNewContextOptions? contextOptions = null)
     {
         var opts = launchOptions ?? new BrowserTypeLaunchOptions();
+        if (browserType.Name == "chromium" && opts.Channel is null && opts.ExecutablePath is null)
+        {
+            opts.Channel = "chromium";
+        }
         opts.Args = opts.Args is null
             ? StealthArgs
-            : [..opts.Args, ..StealthArgs];
+            : [.. opts.Args, .. StealthArgs];
 
         var browser = await browserType.LaunchAsync(opts).ConfigureAwait(false);
 

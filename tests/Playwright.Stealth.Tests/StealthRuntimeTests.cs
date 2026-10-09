@@ -12,6 +12,7 @@ public sealed class StealthRuntimeTests
     private static readonly BrowserTypeLaunchOptions HeadlessLaunchOptions = new()
     {
         Headless = true,
+        Channel = "chromium",
         Args = PlaywrightStealthExtensions.StealthArgs
     };
 

@@ -32,6 +32,7 @@ using var playwright = await Playwright.CreateAsync();
 await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
 {
     Headless = true,
+    Channel = "chromium",
     Args = PlaywrightStealthExtensions.StealthArgs // recommended Chrome flags
 });
 
@@ -85,7 +86,9 @@ await context.ApplyStealthAsync(config);
 
 ## Patched Signals
 
-The configuration can patch **31 detection vectors** across these categories. Defaults preserve native navigator values where current Chromium already exposes a normal value.
+The configuration covers **31 detection vectors** across these categories. Defaults preserve native navigator, GPU, screen, permission, media and speech APIs where current Chromium already exposes normal values. Canvas/audio noise is opt-in because it can introduce detectable inconsistencies. `PerformanceJitter` coarsens `performance.now()` to milliseconds by default while keeping it monotonic and preserving native requestAnimationFrame timestamps. Set it to `false` when sub-millisecond measurements are needed.
+
+On Chromium, `context.ApplyStealthAsync` also initializes dedicated, module, shared and service workers. HTTP shared/service-worker scripts receive initialization in their original response to prevent a first-script race with Playwright; their URLs and strict-mode directives are preserved. Blob/data workers use Chromium's paused-target initialization, whose timing can also depend on other CDP clients. User-Agent headers and client hints use the same identity as the page; configured CPU counts and navigator values are applied to workers too. Setup briefly opens a locally fulfilled initialization page and closes it before returning. One separate blank context per browser carries Chromium's CDP protocol messages until the browser closes; its network requests are blocked. Apply stealth before creating application pages. The page-only overload installs document scripts; use the context overload for worker and request identity consistency.
 
 ### Navigator Properties
 | Patch | Description | Config |
@@ -99,7 +102,7 @@ The configuration can patch **31 detection vectors** across these categories. De
 | `navigator.hardwareConcurrency` | Preserves native value by default; configurable CPU core count when supplied | `NavigatorHardwareConcurrency` |
 | `navigator.deviceMemory` | Preserves native value by default; configurable device memory in GB when supplied | `NavigatorDeviceMemory` |
 | `navigator.connection` | Preserves native value when present; mocks NetworkInformation when missing | `NavigatorConnection` |
-| `navigator.permissions` | Normalizes Notification permission state | `NavigatorPermissions` |
+| `navigator.permissions` | Preserves native permission states and PermissionStatus objects | `NavigatorPermissions` |
 | `navigator.maxTouchPoints` | Preserves native value by default; configurable touch point count when supplied | `NavigatorMaxTouchPoints` |
 | `navigator.pdfViewerEnabled` | Preserves native value when present; mocks it when missing | `NavigatorPdfViewer` |
 
@@ -114,34 +117,34 @@ The configuration can patch **31 detection vectors** across these categories. De
 ### Graphics & Rendering
 | Patch | Description | Config |
 |-------|-------------|--------|
-| WebGL vendor/renderer | Spoofs UNMASKED and standard WebGL params; hides ANGLE/SwiftShader | `WebglVendor` |
-| Canvas fingerprint | Adds session-stable noise to canvas rendering | `CanvasFingerprint` |
+| WebGL vendor/renderer | Preserves native GPU values by default; explicit vendor/renderer overrides | `WebglVendor` |
+| Canvas fingerprint | Optional noise; disabled by default | `CanvasFingerprint` |
 | Broken image dimensions | Fixes 16x16 headless artifact to 0x0 | `BrokenImage` |
 
 ### Audio & Media
 | Patch | Description | Config |
 |-------|-------------|--------|
-| AudioContext fingerprint | Adds noise to audio frequency/channel data | `AudioContext` |
+| AudioContext fingerprint | Optional noise; disabled by default | `AudioContext` |
 | Media codecs | Correct codec support responses | `MediaCodecs` |
-| Speech synthesis | Mock voice list for `getVoices()` | `SpeechSynthesis` |
+| Speech synthesis | Preserves native voices and asynchronous voice loading | `SpeechSynthesis` |
 
 ### Window & Screen
 | Patch | Description | Config |
 |-------|-------------|--------|
 | `window.outerWidth/Height` | Realistic outer dimensions | `OuterDimensions` |
-| `screen.*` dimensions | Consistent screen width/height/colorDepth | `ScreenDimensions` |
+| `screen.*` dimensions | Preserves native metrics; supplies fallbacks for missing dimensions | `ScreenDimensions` |
 
 ### Anti-Detection & Timing
 | Patch | Description | Config |
 |-------|-------------|--------|
 | CDP detection | Masks Chrome DevTools Protocol traces | `CdpDetection` |
 | Automation properties | Removes `cdc_*`, `$cdc_*`, `domAutomationController` | `AutomationProperties` |
-| Performance jitter | Adds realistic timing noise to `performance.now()` and `requestAnimationFrame` | `PerformanceJitter` |
+| Performance jitter | Monotonic millisecond clock precision; enabled by default | `PerformanceJitter` |
 
 ### DOM & Internals
 | Patch | Description | Config |
 |-------|-------------|--------|
-| iframe `contentWindow` | Fixes iframe proxy behavior | `IframeContentWindow` |
+| iframe `contentWindow` | Preserves the native getter and srcdoc behavior when available | `IframeContentWindow` |
 | Hairline detection | Fixes Modernizr `offsetHeight` check | `Hairline` |
 
 ## Public API
@@ -191,14 +194,14 @@ string[] args = PlaywrightStealthExtensions.StealthArgs;
 - `NavigatorUserAgentValue` - Custom user agent string
 - `NavigatorPlatformValue` - Custom platform (e.g., "Win32")
 - `NavigatorVendorValue` - Vendor name (default: "Google Inc.")
-- `Vendor` - WebGL vendor (default: "Intel Inc.")
-- `Renderer` - WebGL renderer (default: "Intel Iris OpenGL Engine")
+- `Vendor` - WebGL vendor (default: empty to preserve the actual GPU)
+- `Renderer` - WebGL renderer (default: empty to preserve the actual GPU)
 - `Languages` - Language array (default: empty to preserve native values)
 - `RunOnInsecureOrigins` - Allow stealth on http:// origins
 
 ## Testing
 
-Integration tests target **9 bot-detection sites**:
+Integration tests target **10 bot-detection sites**, including both CreepJS pages and both DeviceAndBrowserInfo pages:
 
 - https://www.browserscan.net/bot-detection
 - https://bot.sannysoft.com/
@@ -208,7 +211,16 @@ Integration tests target **9 bot-detection sites**:
 - https://pixelscan.net/bot-check
 - https://bot.incolumitas.com/
 - https://abrahamjuliot.github.io/creepjs/
+- https://abrahamjuliot.github.io/creepjs/tests/prototype.html
 - https://deviceandbrowserinfo.com/info_device
+- https://deviceandbrowserinfo.com/are_you_a_bot
+- https://iphey.com/
+
+`LaunchStealthAsync` selects Playwright's full Chromium channel by default, including its new headless mode. When launching the browser yourself, set `Channel = "chromium"`. The separate `chrome-headless-shell` binary lacks native Chrome APIs and cannot provide the same fingerprint. Tests use full Chromium in both headless and headful modes; the installer uses `--no-shell`. Local tests do not install system dependencies or fonts. Iphey can prompt for optional fonts on macOS, so its regressions run on Linux by default; `RUN_MACOS_IPHEY_TESTS=1` opts in on a Mac where those fonts are already available.
+
+Issue #46 regressions run in both headless and headful Chromium. They assert the detector's own rendered verdict, prototype lies, headless/stealth ratings and worker values, and save screenshots and detector output. Local worker tests also cover the first script in classic, module, shared and service workers, HTTP headers and isolation from unconfigured contexts.
+
+DeviceAndBrowserInfo automation checks must pass on every platform. Its separate full human verdict can be skipped on Linux only when the sole remaining flag is `hasSuspiciousWeakSignals`, native SwiftShader/empty voices are present, and an untouched context confirms the same flag. Both actual assessments are saved. This environment limitation is separate from automation failures and does not change the site's result.
 
 These sites can change at any time. If a site changes, update the corresponding test assertions.
 
@@ -219,7 +231,9 @@ dotnet test --solution ManagedCode.Playwright.Stealth.slnx -c Release
 ```
 
 On Linux CI runners, set `PLAYWRIGHT_INSTALL_DEPS=1` to install system dependencies
-(`playwright install --with-deps`) when tests start.
+(`playwright install --with-deps`) when tests start. Set `PLAYWRIGHT_INSTALL_DEPS=0` to forbid system dependency installation, including in CI, when the browser libraries are already available.
+
+Headful tests on Linux need a display. CI runs the suite with `xvfb-run --auto-servernum`; use the same wrapper locally when no display is available.
 
 Google search verification is optional (Google may block automated traffic). Enable it with:
 

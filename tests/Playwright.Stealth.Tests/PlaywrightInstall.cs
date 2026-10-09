@@ -30,8 +30,8 @@ internal static class PlaywrightInstall
     {
         var installDeps = ShouldInstallDeps();
         return installDeps
-            ? ["install", "--with-deps", "chromium"]
-            : ["install", "chromium"];
+            ? ["install", "--with-deps", "--no-shell", "chromium"]
+            : ["install", "--no-shell", "chromium"];
     }
 
     private static bool ShouldInstallDeps()
@@ -42,6 +42,10 @@ internal static class PlaywrightInstall
         }
 
         var installDeps = Environment.GetEnvironmentVariable("PLAYWRIGHT_INSTALL_DEPS");
+        if (string.Equals(installDeps, "0", StringComparison.Ordinal))
+        {
+            return false;
+        }
         if (string.Equals(installDeps, "1", StringComparison.Ordinal))
         {
             return true;

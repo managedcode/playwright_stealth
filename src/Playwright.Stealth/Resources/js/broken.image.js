@@ -1,6 +1,10 @@
 // Fix broken image dimensions detection
 // Headless Chrome renders broken/missing images at 16x16 while real browsers use 0x0
 try {
+    const image = new Image()
+    if (image.width !== 16 && image.height !== 16 && image.naturalWidth !== 16 && image.naturalHeight !== 16) {
+        return
+    }
     const originalDescNW = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalWidth')
     const originalDescNH = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalHeight')
 

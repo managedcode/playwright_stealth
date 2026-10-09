@@ -30,13 +30,13 @@ public sealed class StealthConfig
     public bool CdpDetection { get; init; } = true;
     public bool AutomationProperties { get; init; } = true;
     public int NavigatorMaxTouchPoints { get; init; } = -1;
-    public bool CanvasFingerprint { get; init; } = true;
+    public bool CanvasFingerprint { get; init; }
     public bool PerformanceJitter { get; init; } = true;
     public bool NavigatorPdfViewer { get; init; } = true;
-    public bool AudioContext { get; init; } = true;
+    public bool AudioContext { get; init; }
 
-    public string Vendor { get; init; } = "Intel Inc.";
-    public string Renderer { get; init; } = "Intel Iris OpenGL Engine";
+    public string Vendor { get; init; } = string.Empty;
+    public string Renderer { get; init; } = string.Empty;
     public string NavigatorVendorValue { get; init; } = "Google Inc.";
     public string? NavigatorUserAgentValue { get; init; }
     public string? NavigatorPlatformValue { get; init; }

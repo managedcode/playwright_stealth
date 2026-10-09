@@ -1,4 +1,8 @@
 try {
+    // Modern Chromium has correct native srcdoc and detached-frame semantics.
+    if (Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow')?.get) {
+        return
+    }
     // Adds a contentWindow proxy to the provided iframe element
     const addContentWindowProxy = iframe => {
         const contentWindowProxy = {

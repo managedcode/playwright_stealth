@@ -1,6 +1,8 @@
 try {
     if (opts.languages && opts.languages.length > 0) {
-        utils.replaceGetter(Object.getPrototypeOf(navigator), 'languages', opts.languages)
+        const languages = Object.freeze([...opts.languages])
+        utils.replaceGetter(Object.getPrototypeOf(navigator), 'languages', languages)
+        utils.replaceGetter(Object.getPrototypeOf(navigator), 'language', languages[0])
     }
 } catch (err) {
 }

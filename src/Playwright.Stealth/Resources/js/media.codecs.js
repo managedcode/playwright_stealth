@@ -31,10 +31,11 @@ const parseInput = arg => {
 const canPlayType = {
     // Intercept certain requests
     apply: function (target, ctx, args) {
-        if (!args || !args.length) {
-            return target.apply(ctx, args)
+        const nativeValue = utils.cache.Reflect.apply(target, ctx, args)
+        if (nativeValue || !args || !args.length) {
+            return nativeValue
         }
-        const {mime, codecs} = parseInput(args[0])
+        const {mime, codecs} = parseInput(String(args[0]))
         // This specific mp4 codec is missing in Chromium
         if (mime === 'video/mp4') {
             if (codecs.includes('avc1.42E01E')) {
@@ -51,13 +52,13 @@ const canPlayType = {
             return 'probably'
         }
         // Everything else as usual
-        return target.apply(ctx, args)
+        return nativeValue
     }
 }
 
 /* global HTMLMediaElement */
-utils.replaceWithProxy(
-    HTMLMediaElement.prototype,
-    'canPlayType',
-    canPlayType
-)
+const media = document.createElement('video')
+if (!media.canPlayType('video/mp4; codecs="avc1.42E01E"') ||
+    !media.canPlayType('audio/x-m4a') || !media.canPlayType('audio/aac')) {
+    utils.replaceWithProxy(HTMLMediaElement.prototype, 'canPlayType', canPlayType)
+}

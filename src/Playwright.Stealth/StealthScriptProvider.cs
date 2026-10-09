@@ -45,7 +45,7 @@ internal static class StealthScriptProvider
     {
         var scripts = new List<string>
         {
-            "(function(){",
+            "(function(){\n'use strict';",
             config.BuildOptionsScript(),
             Scripts["utils"],
             Scripts["generate_magic_arrays"]
@@ -218,5 +218,24 @@ internal static class StealthScriptProvider
 
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    internal static string BuildWorkerScript(StealthConfig config, IReadOnlyList<string> contextLanguages)
+    {
+        List<string> scripts = ["(function(){\n'use strict';", config.BuildOptionsScript(), Scripts["utils"]];
+        if (config.NavigatorLanguages && config.Languages.Count == 0)
+            scripts.Add($"opts.languages = {System.Text.Json.JsonSerializer.Serialize(contextLanguages)};");
+        void Add(string key) => scripts.Add($"(function(){{\n{Scripts[key]}\n}})();");
+
+        if (config.NavigatorUserAgent) Add("navigator_user_agent");
+        if (config.NavigatorLanguages) Add("navigator_languages");
+        if (config.NavigatorPlatform) Add("navigator_platform");
+        if (config.NavigatorHardwareConcurrency > 0) Add("navigator_hardware_concurrency");
+        if (config.NavigatorDeviceMemory > 0) Add("navigator_device_memory");
+        if (config.WebglVendor) Add("webgl_vendor");
+        if (config.CdpDetection) Add("cdp_detection");
+        if (config.PerformanceJitter) Add("performance_jitter");
+        scripts.Add("})();");
+        return string.Join("\n;\n", scripts);
     }
 }

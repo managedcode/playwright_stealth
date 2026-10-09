@@ -133,7 +133,7 @@ utils.replaceGetterWithProxy = (obj, propName, handler) => {
   }
 
   utils.preloadCache()
-  const proxyObj = new Proxy(descriptor.get, utils.stripProxyFromErrors(handler))
+  const proxyObj = utils.createProxy(descriptor.get, handler)
   utils.replaceProperty(obj, propName, { get: proxyObj })
   utils.redirectToString(proxyObj, descriptor.get)
 
@@ -147,7 +147,9 @@ utils.replaceGetter = (obj, propName, valueFactory) => {
       : valueFactory
 
   if (utils.replaceGetterWithProxy(obj, propName, {
-    apply() {
+    apply(target, receiver, args) {
+      // Keep the native brand check, including calls on the interface prototype.
+      utils.cache.Reflect.apply(target, receiver, args)
       return getter()
     }
   })) {
@@ -159,13 +161,20 @@ utils.replaceGetter = (obj, propName, valueFactory) => {
     return false
   }
 
-  const nativeGetter = function() {
-    return getter()
+  const validator = Object.values(Object.getOwnPropertyDescriptors(obj))
+    .find(descriptor => typeof descriptor.get === 'function')?.get
+  const nativeGetter = {
+    get value() {
+      if (validator) utils.cache.Reflect.apply(validator, this, [])
+      return getter()
+    }
   }
-  utils.patchToString(nativeGetter, `function get ${propName}() { [native code] }`)
+  const fallbackGetter = Object.getOwnPropertyDescriptor(nativeGetter, 'value').get
+  Object.defineProperty(fallbackGetter, 'name', { value: `get ${propName}`, configurable: true })
+  utils.patchToString(fallbackGetter, `function get ${propName}() { [native code] }`)
   Object.defineProperty(obj, propName, {
     ...(descriptor || {}),
-    get: nativeGetter,
+    get: fallbackGetter,
     enumerable: descriptor ? descriptor.enumerable : true,
     configurable: true
   })
@@ -233,35 +242,50 @@ utils.makeNativeString = (name = '') => {
  * @param {object} obj - The object for which to modify the `toString()` representation
  * @param {string} str - Optional string used as a return value
  */
+// A single registry avoids recursive chains of toString proxies and never reads
+// an arbitrary receiver's toString property (which may itself be an accessor).
 utils.patchToString = (obj, str = '') => {
   utils.preloadCache()
-
-  const toStringProxy = new Proxy(Function.prototype.toString, {
-    apply: function(target, ctx) {
-      // This fixes e.g. `HTMLMediaElement.prototype.canPlayType.toString + ""`
-      if (ctx === Function.prototype.toString) {
-        return utils.makeNativeString('toString')
+  if (!utils.nativeStrings) {
+    utils.nativeStrings = new WeakMap()
+    const ownPrototype = Function.prototype
+    const original = ownPrototype.toString
+    const toString = {
+      toString() {
+        const replacement = typeof this === 'function' && utils.nativeStrings.get(this)
+        if (replacement) {
+          return replacement
+        }
+        try {
+          const source = utils.cache.Reflect.apply(original, this, [])
+          if (typeof this === 'function' && !/^function\b[^()]*\(\)\s*\{\s*\[native code\]\s*\}$/.test(source)) {
+            const proto = Object.getPrototypeOf(this)
+            const constructor = proto && Object.getOwnPropertyDescriptor(proto, 'constructor')?.value
+            const foreignToString = proto && Object.getOwnPropertyDescriptor(proto, 'toString')?.value
+            // Delegate only to another realm's Function.prototype. An arbitrary
+            // function prototype with its own toString must not change this API.
+            if (proto !== ownPrototype && typeof constructor === 'function' && constructor.prototype === proto &&
+                utils.cache.Reflect.apply(original, constructor, []) === utils.makeNativeString('Function') &&
+                typeof foreignToString === 'function' && foreignToString !== toString && foreignToString !== original) {
+              return utils.cache.Reflect.apply(foreignToString, this, [])
+            }
+          }
+          return source
+        } catch (error) {
+          // Keep the native TypeError frame and remove this forwarding frame.
+          if (error && typeof error.stack === 'string') {
+            const lines = error.stack.split('\n')
+            lines.splice(2, 1)
+            error.stack = lines.join('\n')
+          }
+          throw error
+        }
       }
-      // `toString` targeted at our proxied Object detected
-      if (ctx === obj) {
-        // We either return the optional string verbatim or derive the most desired result automatically
-        return str || utils.makeNativeString(obj.name)
-      }
-      // Check if the toString protype of the context is the same as the global prototype,
-      // if not indicates that we are doing a check across different windows., e.g. the iframeWithdirect` test case
-      const hasSameProto = Object.getPrototypeOf(
-        Function.prototype.toString
-      ).isPrototypeOf(ctx.toString) // eslint-disable-line no-prototype-builtins
-      if (!hasSameProto) {
-        // Pass the call on to the local Function.prototype.toString instead
-        return ctx.toString()
-      }
-      return target.call(ctx)
-    }
-  })
-  utils.replaceProperty(Function.prototype, 'toString', {
-    value: toStringProxy
-  })
+    }.toString
+    utils.nativeStrings.set(toString, utils.cache.nativeToStringStr)
+    utils.replaceProperty(Function.prototype, 'toString', { value: toString })
+  }
+  utils.nativeStrings.set(obj, str || utils.makeNativeString(obj.name))
 }
 
 /**
@@ -281,41 +305,7 @@ utils.patchToStringNested = (obj = {}) => {
  */
 utils.redirectToString = (proxyObj, originalObj) => {
   utils.preloadCache()
-
-  const toStringProxy = new Proxy(Function.prototype.toString, {
-    apply: function(target, ctx) {
-      // This fixes e.g. `HTMLMediaElement.prototype.canPlayType.toString + ""`
-      if (ctx === Function.prototype.toString) {
-        return utils.makeNativeString('toString')
-      }
-
-      // `toString` targeted at our proxied Object detected
-      if (ctx === proxyObj) {
-        const fallback = () =>
-          originalObj && originalObj.name
-            ? utils.makeNativeString(originalObj.name)
-            : utils.makeNativeString(proxyObj.name)
-
-        // Return the toString representation of our original object if possible
-        return originalObj + '' || fallback()
-      }
-
-      // Check if the toString protype of the context is the same as the global prototype,
-      // if not indicates that we are doing a check across different windows., e.g. the iframeWithdirect` test case
-      const hasSameProto = Object.getPrototypeOf(
-        Function.prototype.toString
-      ).isPrototypeOf(ctx.toString) // eslint-disable-line no-prototype-builtins
-      if (!hasSameProto) {
-        // Pass the call on to the local Function.prototype.toString instead
-        return ctx.toString()
-      }
-
-      return target.call(ctx)
-    }
-  })
-  utils.replaceProperty(Function.prototype, 'toString', {
-    value: toStringProxy
-  })
+  utils.patchToString(proxyObj, utils.cache.Reflect.apply(Function.prototype.toString, originalObj, []))
 }
 
 /**
@@ -334,7 +324,7 @@ utils.redirectToString = (proxyObj, originalObj) => {
 utils.replaceWithProxy = (obj, propName, handler) => {
   utils.preloadCache()
   const originalObj = obj[propName]
-  const proxyObj = new Proxy(obj[propName], utils.stripProxyFromErrors(handler))
+  const proxyObj = utils.createProxy(originalObj, handler)
 
   utils.replaceProperty(obj, propName, { value: proxyObj })
   utils.redirectToString(proxyObj, originalObj)
@@ -357,7 +347,7 @@ utils.replaceWithProxy = (obj, propName, handler) => {
  */
 utils.mockWithProxy = (obj, propName, pseudoTarget, handler) => {
   utils.preloadCache()
-  const proxyObj = new Proxy(pseudoTarget, utils.stripProxyFromErrors(handler))
+  const proxyObj = utils.createProxy(pseudoTarget, handler)
 
   utils.replaceProperty(obj, propName, { value: proxyObj })
   utils.patchToString(proxyObj)
@@ -380,10 +370,20 @@ utils.mockWithProxy = (obj, propName, pseudoTarget, handler) => {
  */
 utils.createProxy = (pseudoTarget, handler) => {
   utils.preloadCache()
-  const proxyObj = new Proxy(pseudoTarget, utils.stripProxyFromErrors(handler))
-  utils.patchToString(proxyObj)
-
-  return proxyObj
+  const cleanHandler = utils.stripProxyFromErrors(handler)
+  // Browser methods and getters are non-constructible. Concise methods preserve
+  // that shape and native prototype-cycle behavior, unlike a Proxy function.
+  const name = pseudoTarget.name
+  const method = {
+    [name](...args) {
+      return cleanHandler.apply
+        ? cleanHandler.apply(pseudoTarget, this, args)
+        : utils.cache.Reflect.apply(pseudoTarget, this, args)
+    }
+  }[name]
+  Object.defineProperty(method, 'length', { value: pseudoTarget.length, configurable: true })
+  utils.patchToString(method)
+  return method
 }
 
 /**

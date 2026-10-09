@@ -19,6 +19,11 @@ public sealed class StealthConfigTests
         await Assert.That(config.NavigatorDeviceMemory).IsEqualTo(0);
         await Assert.That(config.NavigatorMaxTouchPoints).IsEqualTo(-1);
         await Assert.That(config.Languages.Count).IsEqualTo(0);
+        await Assert.That(config.CanvasFingerprint).IsFalse();
+        await Assert.That(config.AudioContext).IsFalse();
+        await Assert.That(config.PerformanceJitter).IsTrue();
+        await Assert.That(config.Vendor).IsEmpty();
+        await Assert.That(config.Renderer).IsEmpty();
     }
 
     [Test]
