@@ -86,7 +86,7 @@ await context.ApplyStealthAsync(config);
 
 ## Patched Signals
 
-The configuration covers **31 detection vectors** across these categories. Defaults preserve native navigator, GPU, screen, permission, media and speech APIs where current Chromium already exposes normal values. Canvas/audio noise is opt-in because it can introduce detectable inconsistencies. `PerformanceJitter` coarsens `performance.now()` to milliseconds by default while keeping it monotonic and preserving native requestAnimationFrame timestamps. Set it to `false` when sub-millisecond measurements are needed.
+The configuration covers **31 detection vectors** across these categories. Defaults preserve native navigator, GPU, screen, permission, media and speech APIs where current Chromium already exposes normal values. Canvas/audio noise is opt-in because it can introduce detectable inconsistencies. `PerformanceJitter` coarsens `performance.now()` to 10ms by default while keeping it monotonic and preserving native requestAnimationFrame timestamps. Set it to `false` when native clock precision is needed.
 
 On Chromium, `context.ApplyStealthAsync` also initializes dedicated, module, shared and service workers. HTTP shared/service-worker scripts receive initialization in their original response to prevent a first-script race with Playwright; their URLs and strict-mode directives are preserved. Blob/data workers use Chromium's paused-target initialization, whose timing can also depend on other CDP clients. User-Agent headers and client hints use the same identity as the page; configured CPU counts and navigator values are applied to workers too. Setup briefly opens a locally fulfilled initialization page and closes it before returning. One separate blank context per browser carries Chromium's CDP protocol messages until the browser closes; its network requests are blocked. Apply stealth before creating application pages. The page-only overload installs document scripts; use the context overload for worker and request identity consistency.
 
@@ -139,7 +139,7 @@ On Chromium, `context.ApplyStealthAsync` also initializes dedicated, module, sha
 |-------|-------------|--------|
 | CDP detection | Masks Chrome DevTools Protocol traces | `CdpDetection` |
 | Automation properties | Removes `cdc_*`, `$cdc_*`, `domAutomationController` | `AutomationProperties` |
-| Performance jitter | Optional monotonic millisecond clock precision; disabled by default to preserve native timing | `PerformanceJitter` |
+| Performance jitter | Monotonic 10ms clock precision to normalize CDP error-stack timing; enabled by default | `PerformanceJitter` |
 
 ### DOM & Internals
 | Patch | Description | Config |
@@ -190,6 +190,8 @@ sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgles2 li
 `NavigatorUserAgent`, `NavigatorVendor`, `NavigatorConnection`, `NavigatorPdfViewer`,
 `BrokenImage`, `SpeechSynthesis`, `ScreenDimensions`,
 `CdpDetection`, `AutomationProperties`, `CanvasFingerprint`, `PerformanceJitter`, `AudioContext`
+
+`PerformanceJitter` keeps `performance.now()` monotonic and preserves native receiver errors and animation-frame timestamps. Set it to `false` to preserve native clock precision; Chromium's CDP error-stack collection may then remain detectable by timing probes.
 
 ### Numeric Options (int)
 

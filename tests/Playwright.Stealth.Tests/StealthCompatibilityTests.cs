@@ -39,7 +39,6 @@ public sealed class StealthCompatibilityTests
                         [HTMLImageElement.prototype, 'naturalHeight'],
                         [HTMLIFrameElement.prototype, 'contentWindow'],
                         [SpeechSynthesis.prototype, 'getVoices'],
-                        [Performance.prototype, 'now'],
                         [Permissions.prototype, 'query'],
                         [Navigator.prototype, 'webdriver'],
                         [WebGLRenderingContext.prototype, 'getParameter'],
@@ -122,6 +121,29 @@ public sealed class StealthCompatibilityTests
     }
 
     [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task ApplyStealth_PerformanceJitterDisabled_PreservesNativeClock(bool headless)
+    {
+        await WithBrowserAsync(headless, async browser =>
+        {
+            await using IBrowserContext context = await browser.NewContextAsync();
+            IPage page = await context.NewPageAsync();
+            string script = StealthScriptProvider.BuildScripts(new() { PerformanceJitter = false }).Single();
+            bool preserved = await page.EvaluateAsync<bool>("""
+                script => {
+                    const before = Object.getOwnPropertyDescriptor(Performance.prototype, 'now');
+                    Function(script)();
+                    const after = Object.getOwnPropertyDescriptor(Performance.prototype, 'now');
+                    return ['value', 'get', 'set', 'enumerable', 'writable', 'configurable']
+                        .every(field => before[field] === after[field]);
+                }
+                """, script);
+            await Assert.That(preserved).IsTrue();
+        });
+    }
+
+    [Test]
     [Arguments(true, false)]
     [Arguments(false, false)]
     [Arguments(true, true)]
@@ -143,9 +165,10 @@ public sealed class StealthCompatibilityTests
                     try { new now(); failures.push('constructible clock'); }
                     catch (error) { if (!(error instanceof TypeError)) failures.push(error.name); }
                     let previous = performance.now();
-                    for (let i = 0; i < 10000; i++) {
+                    const deadline = Date.now() + 30;
+                    while (Date.now() < deadline) {
                         const current = performance.now();
-                        if (reducePrecision && !Number.isInteger(current)) { failures.push('clock precision opt-in ignored'); break; }
+                        if (reducePrecision && current % 10 !== 0) { failures.push('10ms clock precision option ignored'); break; }
                         if (current < previous) { failures.push('clock moved backwards'); break; }
                         previous = current;
                     }

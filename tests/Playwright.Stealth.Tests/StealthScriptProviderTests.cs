@@ -30,7 +30,7 @@ public sealed class StealthScriptProviderTests
         await Assert.That(ContainsScript(scripts, "automationPatterns")).IsTrue();
         await Assert.That(ContainsScript(scripts, "Object.getPrototypeOf(navigator), 'maxTouchPoints'")).IsFalse();
         await Assert.That(ContainsScript(scripts, "noiseSeed")).IsFalse();
-        await Assert.That(ContainsScript(scripts, "Math.floor(utils.cache.Reflect.apply")).IsFalse();
+        await Assert.That(ContainsScript(scripts, "Math.floor(utils.cache.Reflect.apply")).IsTrue();
         await Assert.That(ContainsScript(scripts, "pdfViewerEnabled")).IsTrue();
         await Assert.That(ContainsScript(scripts, "const audioNoiseSeed")).IsFalse();
     }

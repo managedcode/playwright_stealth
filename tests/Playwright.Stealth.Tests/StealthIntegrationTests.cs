@@ -204,6 +204,7 @@ public sealed class StealthIntegrationTests
                             shader: window.fingerprint?.webGLTranslatedLang,
                             gpu: window.fingerprint?.webGPUAdapterInfo,
                             voices: window.fingerprint?.speechSynthesisVoices,
+                            runtimePerf: window.fingerprint?.runtimePerf,
                             language: window.fingerprint?.language,
                             locale: window.fingerprint?.localeLanguage })
                         """));
