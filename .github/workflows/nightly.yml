@@ -26,6 +26,11 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore ManagedCode.Playwright.Stealth.slnx
 
+    - name: Install native graphics driver
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgles2 libgl1-mesa-dri
+
     - name: Build
       run: dotnet build ManagedCode.Playwright.Stealth.slnx --configuration Release --no-restore
 

@@ -196,6 +196,18 @@ public sealed class StealthIntegrationTests
                     Failures = failures,
                     DetectorText = await page.Locator("body").InnerTextAsync()
                 }, new JsonSerializerOptions { WriteIndented = true }));
+                if (url == StealthTestSites.DeviceAndBrowserBotCheck)
+                {
+                    Console.WriteLine(await page.EvaluateAsync<string>("""
+                        () => JSON.stringify({ renderer: window.fingerprint?.webGLRenderer,
+                            vendor: window.fingerprint?.webGLVendor,
+                            shader: window.fingerprint?.webGLTranslatedLang,
+                            gpu: window.fingerprint?.webGPUAdapterInfo,
+                            voices: window.fingerprint?.speechSynthesisVoices,
+                            language: window.fingerprint?.language,
+                            locale: window.fingerprint?.localeLanguage })
+                        """));
+                }
                 await Assert.That(failures).IsEmpty();
             }
             finally

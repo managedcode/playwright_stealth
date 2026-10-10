@@ -75,7 +75,7 @@ public sealed class StealthCompatibilityTests
         await using IBrowserContext context = launched.Context;
         IPage page = await context.NewPageAsync();
         string[] failures = await page.EvaluateAsync<string[]>("""
-            async () => {
+            requireNativeOpenGl => (async () => {
                 const inspect = () => {
                     const results = [];
                     for (const type of ['webgl', 'webgl2']) {
@@ -94,6 +94,9 @@ public sealed class StealthCompatibilityTests
                     return results;
                 };
                 const main = inspect();
+                if (requireNativeOpenGl && main.some(value => /SwiftShader/i.test(value.renderer))) {
+                    return [`Native EGL driver unavailable: ${JSON.stringify(main)}`];
+                }
                 const url = URL.createObjectURL(new Blob([
                     `const inspect = ${inspect}; try { postMessage({ results: inspect() }); }
                      catch (error) { postMessage({ error: error.message }); }`
@@ -112,8 +115,8 @@ public sealed class StealthCompatibilityTests
                     worker.terminate();
                     URL.revokeObjectURL(url);
                 }
-            }
-            """);
+            })()
+            """, OperatingSystem.IsLinux());
         await Assert.That(failures).IsEmpty();
     }
 
