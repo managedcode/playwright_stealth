@@ -139,7 +139,7 @@ On Chromium, `context.ApplyStealthAsync` also initializes dedicated, module, sha
 |-------|-------------|--------|
 | CDP detection | Masks Chrome DevTools Protocol traces | `CdpDetection` |
 | Automation properties | Removes `cdc_*`, `$cdc_*`, `domAutomationController` | `AutomationProperties` |
-| Performance jitter | Monotonic millisecond clock precision; enabled by default | `PerformanceJitter` |
+| Performance jitter | Optional monotonic millisecond clock precision; disabled by default to preserve native timing | `PerformanceJitter` |
 
 ### DOM & Internals
 | Patch | Description | Config |
@@ -173,6 +173,12 @@ string[] args = PlaywrightStealthExtensions.StealthArgs;
 ```
 
 On Linux these arguments select ANGLE's native OpenGL backend through EGL and allow the installed driver, including Mesa on CI runners, instead of falling back to SwiftShader. This also supports headless rendering without a display. WebGL rendering and shader reporting remain native in pages and workers. `LaunchStealthAsync` preserves an explicitly supplied `--use-angle` or `--use-gl` backend. Linux hosts need a working EGL/OpenGL driver; headful runs also need a display.
+
+For Ubuntu runners, install the native graphics libraries alongside Playwright's browser dependencies:
+
+```bash
+sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgles2 libgl1-mesa-dri
+```
 
 ## Configuration Reference
 

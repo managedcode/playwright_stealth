@@ -31,7 +31,7 @@ public sealed class StealthConfig
     public bool AutomationProperties { get; init; } = true;
     public int NavigatorMaxTouchPoints { get; init; } = -1;
     public bool CanvasFingerprint { get; init; }
-    public bool PerformanceJitter { get; init; } = true;
+    public bool PerformanceJitter { get; init; }
     public bool NavigatorPdfViewer { get; init; } = true;
     public bool AudioContext { get; init; }
 

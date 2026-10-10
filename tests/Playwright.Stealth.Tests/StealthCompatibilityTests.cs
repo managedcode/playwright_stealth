@@ -39,6 +39,7 @@ public sealed class StealthCompatibilityTests
                         [HTMLImageElement.prototype, 'naturalHeight'],
                         [HTMLIFrameElement.prototype, 'contentWindow'],
                         [SpeechSynthesis.prototype, 'getVoices'],
+                        [Performance.prototype, 'now'],
                         [Permissions.prototype, 'query'],
                         [Navigator.prototype, 'webdriver'],
                         [WebGLRenderingContext.prototype, 'getParameter'],
@@ -121,18 +122,20 @@ public sealed class StealthCompatibilityTests
     }
 
     [Test]
-    [Arguments(true)]
-    [Arguments(false)]
-    public async Task ApplyStealth_PerformanceClock_RemainsMonotonicAndPreservesNativeErrors(bool headless)
+    [Arguments(true, false)]
+    [Arguments(false, false)]
+    [Arguments(true, true)]
+    [Arguments(false, true)]
+    public async Task ApplyStealth_PerformanceClock_RemainsMonotonicAndPreservesNativeErrors(bool headless, bool reducePrecision)
     {
         await WithBrowserAsync(headless, async browser =>
         {
             await using IBrowserContext context = await browser.NewContextAsync();
-            await context.ApplyStealthAsync();
+            await context.ApplyStealthAsync(new() { PerformanceJitter = reducePrecision });
             IPage page = await context.NewPageAsync();
             await page.GotoAsync("about:blank");
             string[] failures = await page.EvaluateAsync<string[]>("""
-                () => {
+                reducePrecision => {
                     const failures = [];
                     const now = Performance.prototype.now;
                     try { now.call({}); failures.push('accepted invalid receiver'); }
@@ -142,6 +145,7 @@ public sealed class StealthCompatibilityTests
                     let previous = performance.now();
                     for (let i = 0; i < 10000; i++) {
                         const current = performance.now();
+                        if (reducePrecision && !Number.isInteger(current)) { failures.push('clock precision opt-in ignored'); break; }
                         if (current < previous) { failures.push('clock moved backwards'); break; }
                         previous = current;
                     }
@@ -150,7 +154,7 @@ public sealed class StealthCompatibilityTests
                     if (Math.abs(performance.timeOrigin + performance.now() - Date.now()) > 1000) failures.push('clock time origin');
                     return failures;
                 }
-                """);
+                """, reducePrecision);
             await Assert.That(failures).IsEmpty();
         });
     }
