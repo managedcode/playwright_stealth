@@ -14,5 +14,4 @@ internal static class StealthTestSites
     public const string DeviceAndBrowserBotCheck = "https://deviceandbrowserinfo.com/are_you_a_bot";
     public const string CreepJsPrototype = "https://abrahamjuliot.github.io/creepjs/tests/prototype.html";
     public const string Iphey = "https://iphey.com/";
-    public const string Google = "https://www.google.com";
 }

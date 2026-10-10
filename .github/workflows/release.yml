@@ -100,10 +100,10 @@ jobs:
           echo "$RESULT"
           OUTPUT="$OUTPUT$RESULT"
 
-          if [ $EXIT_CODE -eq 0 ]; then
+          if [ $EXIT_CODE -eq 0 ] && echo "$RESULT" | grep -q "Your package was pushed"; then
             echo "Successfully published $package"
             PUBLISHED=true
-          elif echo "$RESULT" | grep -q "already exists"; then
+          elif [ $EXIT_CODE -eq 0 ] || echo "$RESULT" | grep -q "already exists"; then
             echo "Package already exists, skipping..."
           else
             echo "Failed to publish $package"

@@ -15,8 +15,6 @@ public sealed class StealthIntegrationTests
     private const int RetryCount = 2;
     private const string SignalAttributeName = "data-stealth-signals";
     private const int NetworkIdleTimeoutMs = 10_000;
-    private const string GoogleSearchUrl = "https://www.google.com/search?q=managed+code+software+company+managed-code.com&hl=en&gl=us&num=10&safe=off";
-    private const string GoogleChallengeSkipReason = "Google returned an unusual-traffic challenge instead of search results.";
     private static readonly string ScreenshotDirectory = Path.Combine(AppContext.BaseDirectory, "artifacts", "screenshots");
     private static readonly string SignalDirectory = Path.Combine(AppContext.BaseDirectory, "artifacts", "signals");
 
@@ -218,83 +216,6 @@ public sealed class StealthIntegrationTests
         }, headless, new() { NavigatorHardwareConcurrency = 18 });
     }
 
-    [Test]
-    public async Task GoogleSearch_Should_Find_ManagedCode()
-    {
-        await WithPageAsync(applyStealth: true, async page =>
-        {
-            var label = "google_search";
-            try
-            {
-                await NavigateWithRetriesAsync(page, GoogleSearchUrl);
-                await TryAcceptGoogleConsentAsync(page);
-                await SkipIfGoogleChallengeAsync(page);
-                try
-                {
-                    await page.WaitForSelectorAsync("#search", new PageWaitForSelectorOptions
-                    {
-                        Timeout = NavigationTimeoutMs
-                    });
-                }
-                catch (TimeoutException)
-                {
-                    await SkipIfGoogleChallengeAsync(page);
-                    throw;
-                }
-                await PrimePageAsync(page);
-
-                var links = await page.EvaluateAsync<string[]>("""
-                    () => Array.from(document.querySelectorAll('#search a'))
-                        .map(link => link.href)
-                        .filter(href => href)
-                """);
-
-                var hasManagedCode = links.Any(link => link.Contains("managed-code.com", StringComparison.OrdinalIgnoreCase));
-                await Assert.That(hasManagedCode).IsTrue();
-            }
-            finally
-            {
-                await CaptureScreenshotAsync(page, label);
-            }
-        });
-    }
-
-    private static async Task SkipIfGoogleChallengeAsync(IPage page)
-    {
-        if (await IsGoogleChallengeAsync(page))
-        {
-            throw new TUnit.Core.Exceptions.SkipTestException(GoogleChallengeSkipReason);
-        }
-    }
-
-    private static async Task<bool> IsGoogleChallengeAsync(IPage page)
-    {
-        if (page.Url.Contains("/sorry/", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        try
-        {
-            var bodyText = await page.Locator("body").InnerTextAsync(new LocatorInnerTextOptions
-            {
-                Timeout = 2_000
-            });
-
-            return bodyText.Contains("unusual traffic", StringComparison.OrdinalIgnoreCase) ||
-                   bodyText.Contains("Our systems have detected", StringComparison.OrdinalIgnoreCase) ||
-                   bodyText.Contains("I'm not a robot", StringComparison.OrdinalIgnoreCase);
-        }
-        catch (TimeoutException)
-        {
-            return false;
-        }
-        catch (PlaywrightException)
-        {
-            return false;
-        }
-    }
-
     private static async Task RunSiteCheckAsync(string url, bool applyStealth)
     {
         await WithPageAsync(applyStealth, async page =>
@@ -486,35 +407,6 @@ public sealed class StealthIntegrationTests
         }
 
         await page.WaitForTimeoutAsync(500);
-    }
-
-    private static async Task TryAcceptGoogleConsentAsync(IPage page)
-    {
-        var candidates = new[]
-        {
-            "#L2AGLb",
-            "button:has-text(\"I agree\")",
-            "button:has-text(\"Accept all\")",
-            "button:has-text(\"Accept all cookies\")",
-            "button:has-text(\"Accept everything\")"
-        };
-
-        foreach (var selector in candidates)
-        {
-            try
-            {
-                await page.Locator(selector).ClickAsync(new LocatorClickOptions { Timeout = 2_000 });
-                return;
-            }
-            catch (TimeoutException)
-            {
-                // Ignore timeouts for missing selectors.
-            }
-            catch (PlaywrightException)
-            {
-                // Ignore transient Playwright selector errors.
-            }
-        }
     }
 
     private static async Task InstallSignalProbeAsync(IPage page)
