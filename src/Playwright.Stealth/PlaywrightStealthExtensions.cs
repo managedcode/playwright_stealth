@@ -18,7 +18,10 @@ public static class PlaywrightStealthExtensions
         "--disable-client-side-phishing-detection",
         "--disable-hang-monitor",
         "--disable-breakpad",
-        "--metrics-recording-only"
+        "--metrics-recording-only",
+        // Use the native OpenGL driver on Linux, including Mesa on CI runners.
+        // Chromium otherwise falls back to the detectable SwiftShader backend.
+        .. OperatingSystem.IsLinux() ? new[] { "--use-angle=gl-egl", "--ignore-gpu-blocklist" } : []
     ];
 
     /// <summary>
@@ -64,9 +67,14 @@ public static class PlaywrightStealthExtensions
         {
             opts.Channel = "chromium";
         }
-        opts.Args = opts.Args is null
+        string[]? requestedArgs = opts.Args?.ToArray();
+        bool hasRequestedGraphicsBackend = requestedArgs?.Any(argument =>
+            argument.StartsWith("--use-angle=", StringComparison.Ordinal)
+            || argument.StartsWith("--use-gl=", StringComparison.Ordinal)) ?? false;
+        opts.Args = requestedArgs is null
             ? StealthArgs
-            : [.. opts.Args, .. StealthArgs];
+            : [.. requestedArgs, .. StealthArgs.Where(argument =>
+                !hasRequestedGraphicsBackend || !argument.StartsWith("--use-angle=", StringComparison.Ordinal))];
 
         var browser = await browserType.LaunchAsync(opts).ConfigureAwait(false);
 

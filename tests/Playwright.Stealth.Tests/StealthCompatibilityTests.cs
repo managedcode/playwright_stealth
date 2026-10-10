@@ -65,6 +65,61 @@ public sealed class StealthCompatibilityTests
     [Test]
     [Arguments(true)]
     [Arguments(false)]
+    public async Task LaunchStealth_DefaultOptions_RendersWebGlInPageAndWorker(bool headless)
+    {
+        await PlaywrightInstall.EnsureInstalledAsync();
+        using IPlaywright playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        (IBrowser Browser, IBrowserContext Context) launched = await playwright.Chromium.LaunchStealthAsync(
+            launchOptions: new() { Headless = headless });
+        await using IBrowser browser = launched.Browser;
+        await using IBrowserContext context = launched.Context;
+        IPage page = await context.NewPageAsync();
+        string[] failures = await page.EvaluateAsync<string[]>("""
+            async () => {
+                const inspect = () => {
+                    const results = [];
+                    for (const type of ['webgl', 'webgl2']) {
+                        const gl = new OffscreenCanvas(1, 1).getContext(type);
+                        if (!gl) throw new Error(`${type} unavailable`);
+                        const extension = gl.getExtension('WEBGL_debug_renderer_info');
+                        if (!extension) throw new Error(`${type} renderer unavailable`);
+                        gl.clearColor(1, 0, 0, 1);
+                        gl.clear(gl.COLOR_BUFFER_BIT);
+                        const pixel = new Uint8Array(4);
+                        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                        if (String(pixel) !== '255,0,0,255') throw new Error(`${type} pixel: ${pixel}`);
+                        results.push({ type, vendor: gl.getParameter(extension.UNMASKED_VENDOR_WEBGL),
+                            renderer: gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) });
+                    }
+                    return results;
+                };
+                const main = inspect();
+                const url = URL.createObjectURL(new Blob([
+                    `const inspect = ${inspect}; try { postMessage({ results: inspect() }); }
+                     catch (error) { postMessage({ error: error.message }); }`
+                ], { type: 'application/javascript' }));
+                const worker = new Worker(url);
+                try {
+                    const result = await new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => reject(new Error('WebGL worker timed out')), 20_000);
+                        worker.onmessage = event => { clearTimeout(timer); resolve(event.data); };
+                        worker.onerror = event => { clearTimeout(timer); reject(new Error(event.message)); };
+                    });
+                    if (result.error) return [result.error];
+                    return JSON.stringify(main) === JSON.stringify(result.results)
+                        ? [] : [`WebGL page/worker mismatch: ${JSON.stringify({ main, worker: result.results })}`];
+                } finally {
+                    worker.terminate();
+                    URL.revokeObjectURL(url);
+                }
+            }
+            """);
+        await Assert.That(failures).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
     public async Task ApplyStealth_PerformanceClock_RemainsMonotonicAndPreservesNativeErrors(bool headless)
     {
         await WithBrowserAsync(headless, async browser =>

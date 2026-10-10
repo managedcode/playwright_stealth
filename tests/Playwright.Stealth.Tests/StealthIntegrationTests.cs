@@ -196,8 +196,6 @@ public sealed class StealthIntegrationTests
                     Failures = failures,
                     DetectorText = await page.Locator("body").InnerTextAsync()
                 }, new JsonSerializerOptions { WriteIndented = true }));
-                if (url == StealthTestSites.DeviceAndBrowserBotCheck && requireHumanVerdict && failures.Length > 0)
-                    await SkipIfNativeWeakSignalsAsync(page, label);
                 await Assert.That(failures).IsEmpty();
             }
             finally
@@ -207,44 +205,7 @@ public sealed class StealthIntegrationTests
         }, headless, new() { NavigatorHardwareConcurrency = 18 });
     }
 
-    private static async Task SkipIfNativeWeakSignalsAsync(IPage page, string label)
-    {
-        if (!OperatingSystem.IsLinux()) return;
-        const string Assessment = """
-            () => JSON.stringify({ result: JSON.parse(document.querySelector('#jsonResult').textContent),
-                renderer: window.fingerprint?.webGLRenderer,
-                voices: window.fingerprint?.speechSynthesisVoices.numVoices })
-            """;
-        using JsonDocument assessment = JsonDocument.Parse(await page.EvaluateAsync<string>(Assessment));
-        JsonElement[] detected = assessment.RootElement.GetProperty("result").GetProperty("details")
-            .EnumerateObject().Where(value => value.Value.ValueKind == JsonValueKind.True).Select(value => value.Value).ToArray();
-        JsonElement details = assessment.RootElement.GetProperty("result").GetProperty("details");
-        if (detected.Length != 1 || !details.GetProperty("hasSuspiciousWeakSignals").GetBoolean()
-            || !assessment.RootElement.GetProperty("renderer").GetString()!.Contains("SwiftShader", StringComparison.Ordinal)
-            || assessment.RootElement.GetProperty("voices").GetInt32() != 0) return;
-
-        // Confirm the same environment signal in an untouched context before
-        // marking the full-human verdict unsupported by this machine profile.
-        await using IBrowserContext native = await page.Context.Browser!.NewContextAsync(new()
-        {
-            Locale = CultureInfo.CurrentCulture.Name,
-            ViewportSize = new() { Width = 1920, Height = 1080 },
-            DeviceScaleFactor = 2
-        });
-        IPage baseline = await native.NewPageAsync();
-        await NavigateWithRetriesAsync(baseline, StealthTestSites.DeviceAndBrowserBotCheck);
-        await baseline.WaitForFunctionAsync("() => document.querySelector('#jsonResult')?.textContent.trim()", options: new() { Timeout = NavigationTimeoutMs });
-        string baselineJson = await baseline.EvaluateAsync<string>(Assessment);
-        await File.WriteAllTextAsync(Path.Combine(SignalDirectory, label + "_native.json"), baselineJson);
-        using JsonDocument nativeAssessment = JsonDocument.Parse(baselineJson);
-        if (nativeAssessment.RootElement.GetProperty("result").GetProperty("details").GetProperty("hasSuspiciousWeakSignals").GetBoolean()
-            && nativeAssessment.RootElement.GetProperty("renderer").GetString() == assessment.RootElement.GetProperty("renderer").GetString()
-            && nativeAssessment.RootElement.GetProperty("voices").GetInt32() == 0)
-            throw new TUnit.Core.Exceptions.SkipTestException("Native Linux Chromium also reports hasSuspiciousWeakSignals with SwiftShader and no system voices. All automation checks passed; the full human verdict requires a desktop browser profile. Both assessments were saved.");
-    }
-
     [Test]
-    [GoogleSearchOnly]
     public async Task GoogleSearch_Should_Find_ManagedCode()
     {
         await WithPageAsync(applyStealth: true, async page =>
@@ -777,16 +738,4 @@ public sealed class StealthIntegrationTests
         public int ViewportHeight { get; set; }
     }
 
-    public sealed class GoogleSearchOnlyAttribute : SkipAttribute
-    {
-        public GoogleSearchOnlyAttribute()
-            : base("Google search test is disabled. Set RUN_GOOGLE_SEARCH_TESTS=1 to enable it.")
-        {
-        }
-
-        public override Task<bool> ShouldSkip(TestRegisteredContext context)
-        {
-            return Task.FromResult(!string.Equals(Environment.GetEnvironmentVariable("RUN_GOOGLE_SEARCH_TESTS"), "1", StringComparison.Ordinal));
-        }
-    }
 }

@@ -172,6 +172,8 @@ var (browser, context) = await playwright.Chromium.LaunchStealthAsync(config, la
 string[] args = PlaywrightStealthExtensions.StealthArgs;
 ```
 
+On Linux these arguments select ANGLE's native OpenGL backend through EGL and allow the installed driver, including Mesa on CI runners, instead of falling back to SwiftShader. This also supports headless rendering without a display. WebGL rendering and shader reporting remain native in pages and workers. `LaunchStealthAsync` preserves an explicitly supplied `--use-angle` or `--use-gl` backend. Linux hosts need a working EGL/OpenGL driver; headful runs also need a display.
+
 ## Configuration Reference
 
 ### Toggle Options (bool)
@@ -218,9 +220,9 @@ Integration tests target **10 bot-detection sites**, including both CreepJS page
 
 `LaunchStealthAsync` selects Playwright's full Chromium channel by default, including its new headless mode. When launching the browser yourself, set `Channel = "chromium"`. The separate `chrome-headless-shell` binary lacks native Chrome APIs and cannot provide the same fingerprint. Tests use full Chromium in both headless and headful modes; the installer uses `--no-shell`. Local tests do not install system dependencies or fonts. Iphey can prompt for optional fonts on macOS, so its regressions run on Linux by default; `RUN_MACOS_IPHEY_TESTS=1` opts in on a Mac where those fonts are already available.
 
-Issue #46 regressions run in both headless and headful Chromium. They assert the detector's own rendered verdict, prototype lies, headless/stealth ratings and worker values, and save screenshots and detector output. Local worker tests also cover the first script in classic, module, shared and service workers, HTTP headers and isolation from unconfigured contexts.
+Issue #46 regressions run in both headless and headful Chromium. They assert the detector's own rendered verdict, prototype lies, headless/stealth ratings and worker values, and save screenshots and detector output. Local worker tests also cover the first script in classic, module, shared and service workers, HTTP headers and isolation from unconfigured contexts. Graphics regressions require working WebGL and WebGL2, verify actual rendered pixels and compare the native renderer in pages and workers.
 
-DeviceAndBrowserInfo automation checks must pass on every platform. Its separate full human verdict can be skipped on Linux only when the sole remaining flag is `hasSuspiciousWeakSignals`, native SwiftShader/empty voices are present, and an untouched context confirms the same flag. Both actual assessments are saved. This environment limitation is separate from automation failures and does not change the site's result.
+DeviceAndBrowserInfo automation checks and the full human verdict must pass on every platform, in both headless and headful modes. Any positive bot verdict, including `hasSuspiciousWeakSignals`, fails the full-verdict test. Screenshots and actual detector output are saved.
 
 These sites can change at any time. If a site changes, update the corresponding test assertions.
 
@@ -235,11 +237,7 @@ On Linux CI runners, set `PLAYWRIGHT_INSTALL_DEPS=1` to install system dependenc
 
 Headful tests on Linux need a display. CI runs the suite with `xvfb-run --auto-servernum`; use the same wrapper locally when no display is available.
 
-Google search verification is optional (Google may block automated traffic). Enable it with:
-
-```bash
-RUN_GOOGLE_SEARCH_TESTS=1 dotnet test --solution ManagedCode.Playwright.Stealth.slnx -c Release
-```
+Google search verification runs with the full suite, including CI and nightly, without an opt-in flag. Google may block a runner's IP; an actual unusual-traffic challenge is recorded as a skip with its reason.
 
 ## Attribution
 
