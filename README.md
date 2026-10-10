@@ -211,41 +211,75 @@ sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgles2 li
 
 ## Testing
 
-Integration tests target **10 bot-detection sites**, including both CreepJS pages and both DeviceAndBrowserInfo pages:
+The 1.1.1 suite contains **64 test cases**: 5 configuration/script-provider tests, 12 runtime tests, 16 compatibility tests and 31 live-site integration tests. Detector coverage spans **12 pages across 10 sites**, with Google search checked separately. CI, Nightly and Release run the full suite.
 
-- https://www.browserscan.net/bot-detection
-- https://bot.sannysoft.com/
-- https://www.intoli.com/blog/not-possible-to-block-chrome-headless/chrome-headless-test.html
-- https://fingerprint.com/demo
-- https://arh.antoinevastel.com/bots/areyouheadless/
-- https://pixelscan.net/bot-check
-- https://bot.incolumitas.com/
-- https://abrahamjuliot.github.io/creepjs/
-- https://abrahamjuliot.github.io/creepjs/tests/prototype.html
-- https://deviceandbrowserinfo.com/info_device
-- https://deviceandbrowserinfo.com/are_you_a_bot
-- https://iphey.com/
+### Issue #46 detector regressions
 
-`LaunchStealthAsync` selects Playwright's full Chromium channel by default, including its new headless mode. When launching the browser yourself, set `Channel = "chromium"`. The separate `chrome-headless-shell` binary lacks native Chrome APIs and cannot provide the same fingerprint. Tests use full Chromium in both headless and headful modes; the installer uses `--no-shell`. Local tests do not install system dependencies or fonts. Iphey can prompt for optional fonts on macOS, so its regressions run on Linux by default; `RUN_MACOS_IPHEY_TESTS=1` opts in on a Mac where those fonts are already available.
+All five pages from [issue #46](https://github.com/managedcode/playwright_stealth/issues/46#issuecomment-6064954615) have explicit **headless and headful** cases in [StealthIntegrationTests](https://github.com/managedcode/playwright_stealth/blob/v1.1.1/tests/Playwright.Stealth.Tests/StealthIntegrationTests.cs):
 
-Issue #46 regressions run in both headless and headful Chromium. They assert the detector's own rendered verdict, prototype lies, headless/stealth ratings and worker values, and save screenshots and detector output. Local worker tests also cover the first script in classic, module, shared and service workers, HTTP headers and isolation from unconfigured contexts. Graphics regressions require working WebGL and WebGL2, verify actual rendered pixels and compare the native renderer in pages and workers.
+| Detector page | Required assertion |
+|---------------|--------------------|
+| [Iphey](https://iphey.com/) | Browser assessment is present and does not report an error. |
+| [DeviceAndBrowserInfo bot assessment](https://deviceandbrowserinfo.com/are_you_a_bot) | Full verdict reports `isBot: false`; separate tests check automation signals. |
+| [CreepJS prototype tests](https://abrahamjuliot.github.io/creepjs/tests/prototype.html) | Reports `0 lies detected`. |
+| [CreepJS](https://abrahamjuliot.github.io/creepjs/) | Headless and stealth ratings both report `0%`. |
+| [Incolumitas](https://bot.incolumitas.com/) | Page, dedicated-worker and service-worker navigator values match, including user agent, platform, CPU count and languages. |
 
-DeviceAndBrowserInfo automation checks and the full human verdict must pass on every platform, in both headless and headful modes. Any positive bot verdict, including `hasSuspiciousWeakSignals`, fails the full-verdict test. Screenshots and actual detector output are saved.
+DeviceAndBrowserInfo's full human verdict is mandatory on every platform in both modes. Any positive bot verdict, including `hasSuspiciousWeakSignals`, fails the test. Detector failures are never converted to skips. Tests save actual detector output and attempt screenshots for diagnosis.
 
-These sites can change at any time. If a site changes, update the corresponding test assertions.
+Additional detector pages are [BrowserScan](https://www.browserscan.net/bot-detection), [SannySoft](https://bot.sannysoft.com/), [Intoli](https://www.intoli.com/blog/not-possible-to-block-chrome-headless/chrome-headless-test.html), [Fingerprint](https://fingerprint.com/demo), [Are You Headless](https://arh.antoinevastel.com/bots/areyouheadless/), [PixelScan](https://pixelscan.net/bot-check) and [DeviceAndBrowserInfo device info](https://deviceandbrowserinfo.com/info_device). The suite also captures baseline signals without stealth. Live sites can change; update the corresponding assertions when their detector output changes.
 
-Run tests (Playwright browsers install automatically on first run):
+### Browser runtime regressions
+
+[StealthCompatibilityTests](https://github.com/managedcode/playwright_stealth/blob/v1.1.1/tests/Playwright.Stealth.Tests/StealthCompatibilityTests.cs) run in both browser modes and check:
+
+| Coverage | Required behavior |
+|----------|-------------------|
+| Native rendering APIs | Default settings preserve canvas, audio, screen, image, iframe, speech, permission and WebGL descriptors. |
+| WebGL / WebGL2 | Real rendered pixels are correct and native vendor/renderer values match between page and worker. Linux defaults must use a native EGL driver rather than SwiftShader. |
+| Performance clock | Enabled and disabled `PerformanceJitter` settings keep the clock monotonic and preserve native receiver errors, signature and time origin. Enabled precision is 10ms; disabling it preserves the native descriptor. |
+| Function prototypes and frames | Native receiver errors, cross-frame function source and srcdoc iframe behavior remain consistent. |
+| Worker initialization | First scripts in classic, module, shared and service workers match page navigator values and request identity. HTTP headers, strict-mode scripts and isolation from unconfigured contexts are covered. |
+
+[StealthRuntimeTests](https://github.com/managedcode/playwright_stealth/blob/v1.1.1/tests/Playwright.Stealth.Tests/StealthRuntimeTests.cs) also cover CDP console probes, native navigator/plugins/PDF preservation, explicit navigator overrides and the regression where an existing `chrome.loadTimes` must not abort later scripts.
+
+### Running locally and in CI
+
+Build and run analyzers before testing. Playwright browsers install automatically on the first test run:
 
 ```bash
+dotnet build -c Release ManagedCode.Playwright.Stealth.slnx
+dotnet build -c Release /p:RunAnalyzers=true ManagedCode.Playwright.Stealth.slnx
 dotnet test --solution ManagedCode.Playwright.Stealth.slnx -c Release
 ```
 
-On Linux CI runners, set `PLAYWRIGHT_INSTALL_DEPS=1` to install system dependencies
-(`playwright install --with-deps`) when tests start. Set `PLAYWRIGHT_INSTALL_DEPS=0` to forbid system dependency installation, including in CI, when the browser libraries are already available.
+Tests use full Chromium in both modes; the installer uses `--no-shell`. `LaunchStealthAsync` selects `Channel = "chromium"` by default. Set that channel explicitly when launching manually. The separate `chrome-headless-shell` binary lacks native Chrome APIs and cannot provide the same fingerprint.
 
-Headful tests on Linux need a display. CI runs the suite with `xvfb-run --auto-servernum`; use the same wrapper locally when no display is available.
+Headful tests on Linux need a display. CI installs the [native EGL/OpenGL libraries](#stealth-chrome-arguments) and runs:
 
-Google search verification runs with the full suite, including CI and nightly, without an opt-in flag. Google may block a runner's IP; an actual unusual-traffic challenge is recorded as a skip with its reason.
+```bash
+xvfb-run --auto-servernum dotnet test --solution ManagedCode.Playwright.Stealth.slnx -c Release
+```
+
+On Linux CI runners, `PLAYWRIGHT_INSTALL_DEPS=1` installs Playwright's system dependencies when tests start. Set `PLAYWRIGHT_INSTALL_DEPS=0` to forbid system dependency installation, including in CI, when the libraries are already available. Local tests do not install system dependencies or fonts.
+
+Two environment-dependent exceptions are recorded explicitly:
+
+- Google search runs with the full suite without an opt-in flag. An actual unusual-traffic challenge caused by a runner's IP is recorded as a skip with its reason.
+- Iphey runs on Linux by default because it can request optional fonts on macOS. Mac cases skip unless `RUN_MACOS_IPHEY_TESTS=1` is set on a machine where the necessary fonts are already available.
+
+### Verified release results
+
+[Release 1.1.1](https://github.com/managedcode/playwright_stealth/releases/tag/v1.1.1) was verified on **2026-10-10**, at commit [`6538025`](https://github.com/managedcode/playwright_stealth/commit/65380250876127c8e0e3763a6a70cb2169b690f5):
+
+| Workflow | Verified result |
+|----------|-----------------|
+| [CI](https://github.com/managedcode/playwright_stealth/actions/runs/38044243462) | 64 passed, 0 failed, 0 skipped |
+| [Nightly](https://github.com/managedcode/playwright_stealth/actions/runs/38044276667) | 64 passed, 0 failed, 0 skipped |
+| [Release](https://github.com/managedcode/playwright_stealth/actions/runs/38044243493) | 64 passed, 0 failed, 0 skipped; NuGet publication succeeded |
+| [CodeQL](https://github.com/managedcode/playwright_stealth/actions/runs/38044243466) | Passed |
+
+The published [NuGet 1.1.1 package](https://www.nuget.org/packages/ManagedCode.Playwright.Stealth/1.1.1) was downloaded and checked against the release commit and its embedded 10ms clock script. These results describe that release; current checks appear in [GitHub Actions](https://github.com/managedcode/playwright_stealth/actions).
 
 ## Attribution
 
